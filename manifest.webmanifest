@@ -1,7 +1,7 @@
 {
   "name": "Dashboard Area",
   "short_name": "Dashboard",
-  "description": "Rekap Mingguan Area dan Slot Map Kelas, langsung dari Sheet feed Exboard.",
+  "description": "Rekap Mingguan Area, Acquisition per SA dan Slot Map Kelas, langsung dari Sheet feed Exboard.",
   "lang": "id",
   "start_url": "./",
   "scope": "./",

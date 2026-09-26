@@ -15,7 +15,7 @@
 (function(){
   var last = null;
   try { last = localStorage.getItem('dashboardApp.last'); } catch(e){}
-  location.replace(last === 'slot-map' ? 'slot-map/' : 'rekap/');
+  location.replace(last === 'slot-map' ? 'slot-map/' : last === 'sa' ? 'sa/' : 'rekap/');
 })();
 </script>
 <style>
@@ -28,6 +28,7 @@ a{color:#1c5cab;font-weight:600}
 <body>
 <nav>
   <a href="rekap/">Rekap Mingguan Area</a>
+  <a href="sa/">Acquisition per SA</a>
   <a href="slot-map/">Slot Map Kelas</a>
 </nav>
 </body>
