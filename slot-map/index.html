@@ -14,7 +14,7 @@
 <title>Slot Map Kelas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
 <style>
 :root{
   color-scheme: light;
@@ -62,9 +62,9 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--page);color:var(--ink);font:14px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+body{background:var(--page);color:var(--ink);font:14px/1.45 "Poppins",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 button,input,select{font:inherit;color:inherit}
-h1,h2,h3{margin:0;line-height:1.2;text-wrap:balance;font-family:"Archivo","IBM Plex Sans",system-ui,sans-serif;font-stretch:88%}
+h1,h2,h3{margin:0;line-height:1.2;text-wrap:balance;}
 .wrap{max-width:1240px;margin:0 auto;padding-inline:16px}
 .num{font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)}
@@ -115,8 +115,8 @@ main{padding-block:18px 48px;display:grid;gap:18px}
 @media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:grid;gap:2px}
 .kpi .l{font-size:12px;font-weight:600;color:var(--ink-2)}
-.kpi .v{font-family:"Archivo",sans-serif;font-stretch:85%;font-size:28px;font-weight:750;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.15}
-.kpi .v small{font-size:14px;font-weight:600;color:var(--ink-2);font-family:"IBM Plex Sans",sans-serif}
+.kpi .v{font-size:28px;font-weight:750;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi .v small{font-size:14px;font-weight:600;color:var(--ink-2)}
 .kpi .f{font-size:12px;color:var(--muted)}
 .kpi.main{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
 .kpi.main .l,.kpi.main .f,.kpi.main .v small{color:inherit;opacity:.85}
