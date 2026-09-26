@@ -1,0 +1,635 @@
+<title>Slot Map Kelas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --page:#eef3f3; --surface:#ffffff; --surface-2:#f4f7f7; --ink:#0f1d22; --ink-2:#44565c; --muted:#76878c;
+  --border:rgba(15,29,34,.10); --border-2:rgba(15,29,34,.20);
+  --accent:#0b6475; --accent-ink:#ffffff; --accent-soft:#dcedf0; --rope:#e0e8ea;
+  --u1:#e6f1f3; --u2:#c4e1e6; --u3:#8ec6d0; --u4:#0b6475; --u4-ink:#ffffff;
+  --crit:#c2402e; --crit-bg:#fbe5e1; --crit-ink:#9b2c1d;
+  --warn:#d99a1e; --warn-bg:#fff2d6; --warn-ink:#7a5200;
+  --good-ink:#0d6b3a;
+  --baby:#f7dbe6; --baby-ink:#8a2a53; --tiny:#fde7c4; --tiny-ink:#7c4a05;
+  --little:#d6efdc; --little-ink:#1d6337; --kids:#dbe4fb; --kids-ink:#27449a; --other:#ece9f7; --other-ink:#4b3f86;
+  --hatch:rgba(15,29,34,.06);
+  --shadow:0 1px 2px rgba(15,29,34,.05),0 6px 18px rgba(15,29,34,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page:#0b1214; --surface:#131d20; --surface-2:#1a2629; --ink:#eaf2f3; --ink-2:#b3c3c6; --muted:#83969a;
+    --border:rgba(234,242,243,.10); --border-2:rgba(234,242,243,.20);
+    --accent:#4fb4c6; --accent-ink:#06191d; --accent-soft:#16343a; --rope:#223236;
+    --u1:#172a2e; --u2:#1c3e45; --u3:#236674; --u4:#3fa6b9; --u4-ink:#04161a;
+    --crit:#e7715e; --crit-bg:#3b1a15; --crit-ink:#f4a293;
+    --warn:#e0a934; --warn-bg:#3a2d10; --warn-ink:#f2c86a;
+    --good-ink:#7fd6a3;
+    --baby:#452032; --baby-ink:#f3b3cd; --tiny:#43310f; --tiny-ink:#f6cf8c;
+    --little:#193826; --little-ink:#9bdcb0; --kids:#1e2a4d; --kids-ink:#adc0f5; --other:#2a2546; --other-ink:#c8bff0;
+    --hatch:rgba(234,242,243,.06);
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0b1214; --surface:#131d20; --surface-2:#1a2629; --ink:#eaf2f3; --ink-2:#b3c3c6; --muted:#83969a;
+  --border:rgba(234,242,243,.10); --border-2:rgba(234,242,243,.20);
+  --accent:#4fb4c6; --accent-ink:#06191d; --accent-soft:#16343a; --rope:#223236;
+  --u1:#172a2e; --u2:#1c3e45; --u3:#236674; --u4:#3fa6b9; --u4-ink:#04161a;
+  --crit:#e7715e; --crit-bg:#3b1a15; --crit-ink:#f4a293;
+  --warn:#e0a934; --warn-bg:#3a2d10; --warn-ink:#f2c86a;
+  --good-ink:#7fd6a3;
+  --baby:#452032; --baby-ink:#f3b3cd; --tiny:#43310f; --tiny-ink:#f6cf8c;
+  --little:#193826; --little-ink:#9bdcb0; --kids:#1e2a4d; --kids-ink:#adc0f5; --other:#2a2546; --other-ink:#c8bff0;
+  --hatch:rgba(234,242,243,.06);
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font:14px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3{margin:0;line-height:1.2;text-wrap:balance;font-family:"Archivo","IBM Plex Sans",system-ui,sans-serif;font-stretch:88%}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+/* Header */
+.top{background:var(--surface);border-bottom:1px solid var(--border)}
+.top-inner{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;padding-block:14px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.mark{width:36px;height:36px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
+.mark svg{width:22px;height:22px;stroke:var(--accent-ink);fill:none;stroke-width:2;stroke-linecap:round}
+.brand h1{font-size:20px;font-weight:750;letter-spacing:-.01em}
+.brand p{margin:0;font-size:12.5px;color:var(--ink-2)}
+.sync{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.status{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:4px 11px}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.status.ok::before{background:#1f9d57}
+.status.busy::before{background:var(--warn)}
+.status.err::before{background:var(--crit)}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 13px;border-radius:9px;border:1px solid var(--border-2);background:var(--surface);cursor:pointer;font-weight:600;font-size:13.5px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn:disabled{opacity:.5;cursor:progress}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn:focus-visible,.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Center tabs */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--page);border-bottom:1px solid var(--border)}
+.bar-inner{display:flex;align-items:center;gap:10px;padding-block:10px;overflow-x:auto}
+.bar-label{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);flex:none}
+.tabs{display:flex;gap:4px;flex:none}
+.tabs button{border:1px solid transparent;background:transparent;border-radius:9px;padding:6px 12px;font-weight:700;font-size:14px;letter-spacing:.03em;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:7px}
+.tabs button:hover{background:var(--surface)}
+.tabs button[aria-selected="true"]{background:var(--surface);border-color:var(--border-2);color:var(--ink);box-shadow:var(--shadow)}
+.tabs .tpct{font-size:11.5px;font-weight:600;color:var(--muted)}
+
+main{padding-block:18px 48px;display:grid;gap:18px}
+
+/* Notice */
+.notice{border-radius:12px;padding:12px 14px;font-size:13.5px;display:grid;gap:4px;background:var(--warn-bg);color:var(--warn-ink);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+.notice b{font-weight:700}
+.notice ul{margin:2px 0 0;padding-left:18px}
+.notice.err{background:var(--crit-bg);color:var(--crit-ink);border-color:color-mix(in srgb,var(--crit) 35%,transparent)}
+.notice[hidden]{display:none}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:980px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:grid;gap:2px}
+.kpi .l{font-size:12px;font-weight:600;color:var(--ink-2)}
+.kpi .v{font-family:"Archivo",sans-serif;font-stretch:85%;font-size:28px;font-weight:750;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi .v small{font-size:14px;font-weight:600;color:var(--ink-2);font-family:"IBM Plex Sans",sans-serif}
+.kpi .f{font-size:12px;color:var(--muted)}
+.kpi.main{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.kpi.main .l,.kpi.main .f,.kpi.main .v small{color:inherit;opacity:.85}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;font-size:12.5px;color:var(--ink-2)}
+.legend .grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.legend .ttl{font-weight:700;color:var(--ink);margin-right:2px}
+.sw{display:inline-block;width:22px;height:14px;border-radius:4px;border:1px solid var(--border)}
+
+/* Age chips */
+.age{display:inline-flex;align-items:center;font-size:11.5px;font-weight:700;border-radius:6px;padding:1px 7px;letter-spacing:.01em;white-space:nowrap;background:var(--other);color:var(--other-ink)}
+.age.baby{background:var(--baby);color:var(--baby-ink)}
+.age.tiny{background:var(--tiny);color:var(--tiny-ink)}
+.age.little{background:var(--little);color:var(--little-ink)}
+.age.kids{background:var(--kids);color:var(--kids-ink)}
+.age.none{background:transparent;color:var(--muted);border:1px dashed var(--border-2);font-weight:600}
+
+/* Lane */
+.lane{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.lane-head{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding:12px 14px 10px}
+.lane-head h2{font-size:18px;font-weight:750;letter-spacing:.01em;text-transform:uppercase}
+.lane-head .meta{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.lane-head .meta b{color:var(--ink);font-variant-numeric:tabular-nums}
+.rope{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 14px,var(--rope) 14px 28px);opacity:.9}
+.scroll{overflow-x:auto}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;table-layout:fixed}
+.grid th,.grid td{border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.grid th:last-child,.grid td:last-child{border-right:0}
+.grid thead th{background:var(--surface-2);font-size:12px;font-weight:700;color:var(--ink-2);padding:8px 8px;text-align:left;text-transform:uppercase;letter-spacing:.05em}
+.grid thead th.tcol,.grid td.time{width:64px}
+.grid td.time{position:sticky;left:0;z-index:1;background:var(--surface);font-weight:700;font-variant-numeric:tabular-nums;font-size:13px;padding:8px;vertical-align:top}
+.grid thead th.tcol{position:sticky;left:0;z-index:2}
+.grid tfoot td{background:var(--surface-2);font-size:12px;color:var(--ink-2);padding:7px 8px;font-variant-numeric:tabular-nums;border-bottom:0}
+.grid tfoot td.time{background:var(--surface-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.grid tfoot b{color:var(--ink)}
+
+/* Cell */
+td.c{padding:7px 8px;vertical-align:top;background:var(--surface);height:78px}
+td.c.b-mid{background:var(--u1)}
+td.c.b-high{background:var(--u2)}
+td.c.b-full{background:var(--u3)}
+td.c.b-over{background:var(--crit-bg)}
+td.c.b-closed{background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px),var(--surface)}
+td.c.b-void{background:var(--surface)}
+.c-top{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:20px}
+.c-pct{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.b-full .c-pct{color:var(--ink)}
+.b-over .c-pct{color:var(--crit-ink)}
+.c-fill{display:flex;align-items:center;gap:7px;margin-top:5px;font-variant-numeric:tabular-nums;font-size:13px}
+.c-fill b{font-size:15px;font-weight:700}
+.meter{flex:1;height:5px;border-radius:3px;background:color-mix(in srgb,var(--ink) 10%,transparent);overflow:hidden;min-width:20px}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.b-full .meter i{background:var(--u4)}
+.b-over .meter i{background:var(--crit)}
+.c-coach{margin-top:5px;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+.c-coach svg{width:12px;height:12px;flex:none;stroke:var(--muted);fill:none;stroke-width:2}
+.c-coach.na{color:var(--muted);font-weight:500;font-style:italic}
+.c-empty{color:var(--muted);font-size:12px;padding-top:2px}
+.tag{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 5px}
+.tag.full{background:var(--u4);color:var(--u4-ink)}
+.tag.over{background:var(--crit);color:#fff}
+.tag.closed{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--border-2)}
+.tag.av{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--border-2)}
+
+/* Summary tables */
+.two{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));align-items:start}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow);min-width:0}
+.card h2{font-size:16px;font-weight:750;margin-bottom:2px}
+.card .sub{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.card .scroll{margin-inline:-4px;padding-inline:4px}
+table.sum{width:100%;border-collapse:collapse;font-size:13.5px}
+.sum th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;text-align:left;padding:6px 6px;border-bottom:1px solid var(--border-2);white-space:nowrap}
+.sum td{padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+.sum tr:last-child td{border-bottom:0}
+.sum .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sum .ubar{display:flex;align-items:center;gap:8px;min-width:130px}
+.sum .ubar .meter{height:7px}
+.sum .ubar span{font-variant-numeric:tabular-nums;font-weight:700;width:44px;text-align:right}
+.sum .days{display:flex;gap:3px}
+.sum .days i{font-style:normal;font-size:10.5px;font-weight:700;width:18px;height:18px;border-radius:4px;display:grid;place-items:center;background:var(--surface-2);color:var(--muted)}
+.sum .days i.on{background:var(--accent-soft);color:var(--accent)}
+:root:not([data-theme="light"]) .sum .days i.on{color:var(--ink)}
+
+.empty-state{background:var(--surface);border:1px dashed var(--border-2);border-radius:14px;padding:36px 18px;text-align:center;display:grid;gap:10px;justify-items:center}
+.empty-state h2{font-size:18px}
+.empty-state p{margin:0;color:var(--ink-2);max-width:520px}
+.foot{font-size:12.5px;color:var(--muted);display:grid;gap:4px}
+.foot a{color:var(--accent)}
+.skel{height:220px;border-radius:14px;background:linear-gradient(90deg,var(--surface) 0,var(--surface-2) 50%,var(--surface) 100%);background-size:200% 100%;animation:sh 1.4s infinite linear;border:1px solid var(--border)}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion: reduce){.skel{animation:none}}
+</style>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 4v16M16 4v16" stroke-dasharray="2 2.5"/></svg></div>
+      <div>
+        <h1>Slot Map Kelas</h1>
+        <p>Age group, keterisian &amp; coach per slot · sumber: Exboard › Reguler Class Availability</p>
+      </div>
+    </div>
+    <div class="sync">
+      <span class="status" id="status">Memuat…</span>
+      <button class="btn" id="pullBtn" type="button"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>Tarik ulang</button>
+      <label class="btn" for="csvFile" id="csvLabel" hidden><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M4 21h16"/></svg>Buka CSV</label>
+      <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+    </div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="wrap bar-inner">
+    <span class="bar-label">Center</span>
+    <div class="tabs" role="tablist" id="tabs" aria-label="Pilih center"></div>
+  </div>
+</div>
+
+<main class="wrap" id="main">
+  <div class="notice err" id="errBox" hidden></div>
+  <div class="skel" id="skel"></div>
+  <div id="view"></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= Konfigurasi ================= */
+const FEED_ID = '1TmXlMMf5waCAEn1dS9W7_MKzK028Kkfmvwy5RhBbbb0';   // Sheet "Feed Slot Map (dari Exboard)" = IMPORTRANGE tab Reguler Class Availability
+const FEED_URL = `https://docs.google.com/spreadsheets/d/${FEED_ID}/edit`;
+const GDRIVE = 'Google Drive';
+const CENTERS = ['KLM','KWC','PML','TMP','BTU','HIB'];
+const DAYS = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+const DAY_ABBR = ['S','S','R','K','J','S','M'];
+const AGES = ['Baby','Tiny','Little','Kids'];
+const AGE_RANGE = {Baby:'6–17 bln', Tiny:'18–36 bln', Little:'3–5 th', Kids:'5–8+ th'};
+const CACHE_KEY = 'slotMapKelas.cache.v1';
+const UI_KEY = 'slotMapKelas.ui.v1';
+// Kolom data di tab Reguler Class Availability (B..I), urutan normal:
+const F = {age:0, day:1, time:2, slot:3, cap:4, used:5, avail:6, coach:7};
+const FIELD_LABEL = {cap:'kapasitas', used:'jumlah terisi', avail:'status availability', coach:'coach'};
+
+/* ================= Util ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = v => v==null || !isFinite(v) ? '—' : Math.round(v*100) + '%';
+const fmtN = v => v==null ? '—' : Number(v).toLocaleString('id-ID');
+function lsGet(k){ try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch(e){ return null; } }
+function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function fmtTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+}
+function parseCSV(text){
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i=0; i<text.length; i++){
+    const ch = text[i];
+    if (q){
+      if (ch==='"'){ if (text[i+1]==='"'){ cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch==='"') q = true;
+    else if (ch===','){ row.push(cell); cell = ''; }
+    else if (ch==='\n'){ row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (ch!=='\r') cell += ch;
+  }
+  if (cell!=='' || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+function b64ToText(b64){
+  const bin = atob(b64), bytes = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+// Angka dari sel. Sel berformat tanggal ("1900-01-02") = nomor seri Sheets (1899-12-30 = 0).
+function cellNum(s){
+  if (s===undefined) return undefined;             // kolom hilang di sumber
+  s = String(s==null?'':s).replace(/[\s  ]/g,'');
+  if (s==='' || s[0]==='#') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) return Math.round((Date.UTC(+m[1], +m[2]-1, +m[3]) - Date.UTC(1899,11,30)) / 86400000);
+  const n = Number(s.replace(',', '.'));
+  return isFinite(n) ? n : null;
+}
+function cleanText(s){ return s===undefined ? undefined : String(s==null?'':s).replace(/[  ]/g,' ').trim(); }
+function titleCase(s){ return s.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (a,b,c) => b + c.toUpperCase()); }
+function normAge(s){
+  s = (s||'').trim(); if (!s || /^[-–—.]+$/.test(s)) return '';
+  const k = AGES.find(a => a.toLowerCase() === s.toLowerCase());
+  return k || titleCase(s);
+}
+function normCoach(s){
+  if (s===undefined) return undefined;
+  s = (s||'').replace(/\s+/g,' ').trim();
+  if (!s || s==='-' || /^(available|not available)$/i.test(s)) return '';
+  return titleCase(s);
+}
+
+/* ================= Parser =================
+   Satu baris = satu slot. Kolom "Slot" berisi "Baby - Lane 1 - Senin - 10:30".
+   Di Exboard saat ini blok Lane 2–5 bergeser (Lane n bergeser n-1 kolom ke kanan, sisanya
+   terlipat ke kolom B). Posisi kolom Slot dipakai untuk mendeteksi pergeseran itu, sehingga
+   data tetap terbaca dan otomatis lengkap begitu sumbernya dirapikan. */
+const SLOT_RE = /^(.*?)-\s*Lane\s*(\d+)\s*-\s*([A-Za-z]+)\s*-\s*(\d{1,2})[:.](\d{2})/;
+function parseFeed(text){
+  const rows = parseCSV(text);
+  const slots = [], lost = {};   // lost[lane] = Set(field)
+  let refErr = /#REF!/.test(text.slice(0, 400));
+  for (const r of rows){
+    const center = cleanText(r[0]||'').toUpperCase();
+    if (!/^[A-Z]{2,5}$/.test(center) || center==='CENTER') continue;
+    let j = -1, m = null;
+    for (let k=1; k<=9 && k<r.length; k++){ const mm = SLOT_RE.exec(cleanText(r[k]||'')); if (mm){ j = k; m = mm; break; } }
+    if (j < 4 || !m) continue;
+    const shift = j - 4;
+    const get = f => {                 // nilai kolom ke-f (urutan normal) dengan memperhitungkan pergeseran
+      const pos = 1 + shift + f;
+      if (pos <= 8) return r[pos];
+      const wrapped = pos - 10;
+      return wrapped >= 1 ? r[wrapped] : undefined;
+    };
+    const lane = +m[2];
+    const dayRaw = m[3].toLowerCase();
+    const day = DAYS.find(d => d.toLowerCase() === dayRaw);
+    if (!day) continue;
+    const time = m[4].padStart(2,'0') + ':' + m[5];
+    const age = normAge(m[1].replace(/-\s*$/,'')) || normAge(cleanText(get(F.age)));
+    const cap = cellNum(get(F.cap));
+    const used = cellNum(get(F.used));
+    const availRaw = cleanText(get(F.avail));
+    const avail = availRaw===undefined ? undefined : /^not\s*available$/i.test(availRaw) ? 'NOT AVAILABLE' : /^available$/i.test(availRaw) ? 'AVAILABLE' : '';
+    const coach = normCoach(cleanText(get(F.coach)));
+    const miss = [];
+    if (cap===undefined) miss.push('cap');
+    if (used===undefined) miss.push('used');
+    if (avail===undefined) miss.push('avail');
+    if (coach===undefined) miss.push('coach');
+    if (miss.length){ const s = lost[lane] || (lost[lane] = new Set()); miss.forEach(x => s.add(x)); }
+    slots.push({center, lane, day, time, age, cap, used, avail, coach, miss});
+  }
+  if (slots.length) refErr = false;
+  return {slots, lost, refErr};
+}
+
+/* ================= Klasifikasi slot ================= */
+function band(s){
+  const hasClass = !!(s.age || s.coach || (s.used||0) > 0);
+  if (s.cap===0 && !(s.used>0)) return hasClass ? 'closed' : 'void';
+  if (s.cap===0 && s.used>0) return 'over';
+  if (s.cap==null || s.used==null) return hasClass || s.avail ? 'unknown' : 'void';
+  if (s.used > s.cap) return 'over';
+  if (s.used === s.cap) return 'full';
+  const u = s.used / s.cap;
+  return u >= .6 ? 'high' : u > 0 ? 'mid' : 'zero';
+}
+function measurable(s){ return s.cap!=null && s.used!=null && s.cap > 0; }
+function agg(list){
+  const m = list.filter(measurable);
+  const cap = m.reduce((a,s)=>a+s.cap,0), used = m.reduce((a,s)=>a+s.used,0);
+  return {cap, used, util: cap>0 ? used/cap : null, n: m.length};
+}
+
+/* ================= State ================= */
+let data = null;            // {slots, lost, pulledAt, source}
+let ui = Object.assign({center:'KLM'}, lsGet(UI_KEY) || {});
+let pulling = false;
+
+function setStatus(kind, text){ const el = $('#status'); el.className = 'status ' + kind; el.textContent = text; }
+function showErr(html){ const b = $('#errBox'); if (!html){ b.hidden = true; b.innerHTML = ''; return; } b.innerHTML = html; b.hidden = false; }
+
+/* ================= Render ================= */
+function renderTabs(){
+  const t = $('#tabs');
+  const present = data ? CENTERS.filter(c => data.slots.some(s => s.center===c)) : CENTERS;
+  const extra = data ? Array.from(new Set(data.slots.map(s=>s.center))).filter(c => !CENTERS.includes(c)) : [];
+  const list = present.concat(extra);
+  if (data && !list.includes(ui.center) && list.length) ui.center = list[0];
+  t.innerHTML = list.map(c => {
+    const a = data ? agg(data.slots.filter(s => s.center===c)) : null;
+    return `<button role="tab" type="button" data-c="${esc(c)}" aria-selected="${c===ui.center}">${esc(c)}${a && a.util!=null ? `<span class="tpct">${pct(a.util)}</span>` : ''}</button>`;
+  }).join('');
+}
+
+function cellHTML(s){
+  if (!s) return `<td class="c b-void"></td>`;
+  const b = band(s);
+  const cls = 'c b-' + b;
+  const u = measurable(s) ? s.used / s.cap : null;
+  const title = `${s.day} ${s.time} · Lane ${s.lane}` + (s.age ? ` · ${s.age}` : '') + (s.coach ? ` · ${s.coach}` : '') + (u!=null ? ` · ${s.used}/${s.cap} (${pct(u)})` : '');
+  const ageChip = s.age ? `<span class="age ${esc(s.age.toLowerCase())}">${esc(s.age)}</span>` : `<span class="age none">Tanpa age group</span>`;
+  let right = '';
+  if (b==='full') right = `<span class="tag full">Penuh</span>`;
+  else if (b==='over') right = `<span class="tag over">${s.cap===0 ? 'Kap. 0' : 'Lebih'}</span>`;
+  else if (b==='closed') right = `<span class="tag closed">Tutup</span>`;
+  else if (u!=null) right = `<span class="c-pct">${pct(u)}</span>`;
+  else if (s.avail) right = `<span class="tag av" title="Status availability dari sumber">${s.avail==='AVAILABLE' ? 'Avail' : 'Not avail'}</span>`;
+
+  if (b==='void'){
+    return `<td class="c b-void"><div class="c-empty">—</div></td>`;
+  }
+  if (!s.age && !s.coach && !(s.used>0)){
+    const capT = s.cap==null ? '' : ` · 0/${s.cap}`;
+    return `<td class="c b-void" title="${esc(title)}"><div class="c-empty">Slot kosong${capT}</div></td>`;
+  }
+  let fill;
+  if (s.cap!=null && s.used!=null){
+    const w = s.cap>0 ? Math.min(100, s.used/s.cap*100) : (s.used>0 ? 100 : 0);
+    fill = `<div class="c-fill"><span><b>${s.used}</b>/${s.cap}</span><span class="meter" aria-hidden="true"><i style="width:${w}%"></i></span></div>`;
+  } else {
+    const usedT = s.used==null ? '?' : s.used, capT = s.cap==null ? '?' : s.cap;
+    const why = s.miss.filter(x => x==='cap' || x==='used').map(x => FIELD_LABEL[x]).join(' & ');
+    fill = `<div class="c-fill" title="${esc(why ? why + ' tidak ada di sumber' : 'Data kosong di sumber')}"><span class="muted"><b>${usedT}</b>/${capT}</span></div>`;
+  }
+  let coach;
+  if (s.coach===undefined) coach = `<div class="c-coach na" title="Kolom coach lane ini tidak ada di sumber">coach tak tercatat</div>`;
+  else if (!s.coach) coach = `<div class="c-coach na">—</div>`;
+  else coach = `<div class="c-coach" title="${esc(s.coach)}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>${esc(s.coach)}</div>`;
+  return `<td class="${cls}" title="${esc(title)}"><div class="c-top">${ageChip}${right}</div>${fill}${coach}</td>`;
+}
+
+function laneHTML(lane, list){
+  const times = Array.from(new Set(list.map(s => s.time))).sort();
+  const idx = new Map(list.map(s => [s.day + '|' + s.time, s]));
+  const a = agg(list);
+  const classes = list.filter(s => s.age || s.coach || (s.used||0) > 0).length;
+  const coaches = new Set(list.filter(s => s.coach).map(s => s.coach.toLowerCase())).size;
+  const full = list.filter(s => ['full','over'].includes(band(s))).length;
+  const miss = data.lost[lane] ? Array.from(data.lost[lane]) : [];
+  const rows = times.map(t => `<tr><td class="time">${esc(t)}</td>${DAYS.map(d => cellHTML(idx.get(d + '|' + t))).join('')}</tr>`).join('');
+  const foot = `<tr><td class="time">Util</td>${DAYS.map(d => { const g = agg(list.filter(s => s.day===d)); return `<td>${g.util==null ? '—' : `<b>${pct(g.util)}</b> · ${g.used}/${g.cap}`}</td>`; }).join('')}</tr>`;
+  return `<section class="lane" aria-labelledby="lane-${lane}">
+    <div class="rope" aria-hidden="true"></div>
+    <div class="lane-head">
+      <h2 id="lane-${lane}">Lane ${lane}</h2>
+      <div class="meta">
+        <span>Utilisasi <b>${a.util==null ? '—' : pct(a.util)}</b>${a.util!=null ? ` (${a.used}/${a.cap} kursi)` : ''}</span>
+        <span><b>${classes}</b> slot berisi kelas</span>
+        <span><b>${full}</b> penuh</span>
+        <span><b>${coaches}</b> coach</span>
+        ${miss.length ? `<span class="muted">Tidak ada di sumber: ${esc(miss.map(x => FIELD_LABEL[x]).join(', '))}</span>` : ''}
+      </div>
+    </div>
+    <div class="scroll"><table class="grid">
+      <thead><tr><th class="tcol">Jam</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot>${foot}</tfoot>
+    </table></div>
+  </section>`;
+}
+
+function ubar(u){
+  const w = u==null ? 0 : Math.min(100, u*100);
+  return `<div class="ubar"><span class="meter"><i style="width:${w}%"></i></span><span>${u==null ? '—' : pct(u)}</span></div>`;
+}
+
+function summaryHTML(list){
+  // Per age group
+  const ages = Array.from(new Set(list.filter(s => s.age).map(s => s.age)))
+    .sort((a,b) => (AGES.indexOf(a)+99*(AGES.indexOf(a)<0)) - (AGES.indexOf(b)+99*(AGES.indexOf(b)<0)) || a.localeCompare(b));
+  const ageRows = ages.map(g => {
+    const l = list.filter(s => s.age===g), a = agg(l);
+    return `<tr><td><span class="age ${esc(g.toLowerCase())}">${esc(g)}</span> <span class="muted">${esc(AGE_RANGE[g]||'')}</span></td><td class="r">${l.length}</td><td class="r">${a.cap ? `${a.used}/${a.cap}` : '—'}</td><td>${ubar(a.util)}</td></tr>`;
+  }).join('');
+  // Per coach
+  const byCoach = new Map();
+  list.filter(s => s.coach).forEach(s => { const k = s.coach.toLowerCase(); if (!byCoach.has(k)) byCoach.set(k, {name:s.coach, l:[]}); byCoach.get(k).l.push(s); });
+  const coachRows = Array.from(byCoach.values()).map(c => ({...c, a: agg(c.l)}))
+    .sort((x,y) => y.l.length - x.l.length || x.name.localeCompare(y.name))
+    .map(c => {
+      const days = DAYS.map((d,i) => `<i class="${c.l.some(s => s.day===d) ? 'on' : ''}" title="${d}">${DAY_ABBR[i]}</i>`).join('');
+      const ag = Array.from(new Set(c.l.map(s => s.age).filter(Boolean))).map(g => `<span class="age ${esc(g.toLowerCase())}">${esc(g)}</span>`).join(' ');
+      const lanes = Array.from(new Set(c.l.map(s => s.lane))).sort().join(', ');
+      return `<tr><td><b>${esc(c.name)}</b><div class="muted" style="font-size:12px">Lane ${lanes}</div></td><td>${ag || '<span class="muted">—</span>'}</td><td class="r">${c.l.length}</td><td><span class="days">${days}</span></td><td>${ubar(c.a.util)}</td></tr>`;
+    }).join('');
+  const coachLost = Object.keys(data.lost).filter(l => data.lost[l].has('coach')).map(Number).sort();
+  return `<div class="two">
+    <section class="card"><h2>Per age group</h2><p class="sub">Slot = jumlah sesi per minggu. Utilisasi = terisi ÷ kapasitas, hanya slot yang angkanya lengkap.</p>
+      <div class="scroll"><table class="sum"><thead><tr><th>Age group</th><th class="r">Slot</th><th class="r">Terisi/Kap.</th><th>Utilisasi</th></tr></thead><tbody>${ageRows || '<tr><td colspan="4" class="muted">Belum ada slot dengan age group.</td></tr>'}</tbody></table></div>
+    </section>
+    <section class="card"><h2>Per coach</h2><p class="sub">${coachLost.length ? `Lane ${coachLost.join(', ')} tidak punya kolom coach di sumber, jadi sesi di lane itu belum terhitung.` : 'Semua lane punya data coach.'}</p>
+      <div class="scroll"><table class="sum"><thead><tr><th>Coach</th><th>Age group</th><th class="r">Sesi</th><th>Hari</th><th>Utilisasi</th></tr></thead><tbody>${coachRows || '<tr><td colspan="5" class="muted">Belum ada coach tercatat.</td></tr>'}</tbody></table></div>
+    </section>
+  </div>`;
+}
+
+function render(){
+  renderTabs();
+  $('#skel').hidden = !!data || !!$('#errBox').innerHTML;
+  const v = $('#view');
+  if (!data){ v.innerHTML = ''; renderFoot(); return; }
+  const list = data.slots.filter(s => s.center===ui.center);
+  if (!list.length){ v.innerHTML = `<div class="empty-state"><h2>Belum ada slot untuk ${esc(ui.center)}</h2><p>Tab Reguler Class Availability belum berisi baris untuk center ini.</p></div>`; renderFoot(); return; }
+  const a = agg(list);
+  const classes = list.filter(s => s.age || s.coach || (s.used||0) > 0);
+  const full = list.filter(s => ['full','over'].includes(band(s))).length;
+  const zero = list.filter(s => band(s)==='zero' && s.age).length;
+  const coaches = new Set(list.filter(s => s.coach).map(s => s.coach.toLowerCase())).size;
+  const lanes = Array.from(new Set(list.map(s => s.lane))).sort((x,y)=>x-y);
+
+  const lostLanes = Object.keys(data.lost).map(Number).sort((x,y)=>x-y);
+  const notice = lostLanes.length ? `<div class="notice"><b>Sebagian data lane belum terbaca dari Exboard</b>
+    <span>Di tab Reguler Class Availability, kolom Lane 2–5 bergeser ke kanan (Lane n bergeser n−1 kolom), sehingga beberapa nilai terpotong di sumbernya:</span>
+    <ul>${lostLanes.map(l => `<li>Lane ${l}: ${esc(Array.from(data.lost[l]).map(x => FIELD_LABEL[x]).join(', '))}</li>`).join('')}</ul>
+    <span>Slot Map di Exboard juga hanya terisi Lane 1 karena hal ini. Begitu kolomnya dirapikan di sumber, halaman ini otomatis menampilkan data lengkap.</span></div>` : '';
+
+  v.innerHTML = `${notice}
+    <div class="kpis" style="margin-top:${notice ? 18 : 0}px">
+      <div class="kpi main"><span class="l">Utilisasi ${esc(ui.center)}</span><span class="v">${a.util==null ? '—' : pct(a.util)}</span><span class="f">${a.used}/${a.cap} kursi · ${a.n} slot terukur</span></div>
+      <div class="kpi"><span class="l">Slot berisi kelas</span><span class="v">${classes.length}<small> / ${list.length}</small></span><span class="f">per minggu, ${lanes.length} lane</span></div>
+      <div class="kpi"><span class="l">Slot penuh</span><span class="v">${full}</span><span class="f">terisi ≥ kapasitas</span></div>
+      <div class="kpi"><span class="l">Kelas masih 0 murid</span><span class="v">${zero}</span><span class="f">ada age group, belum terisi</span></div>
+      <div class="kpi"><span class="l">Coach aktif</span><span class="v">${coaches}</span><span class="f">dari slot yang tercatat coach</span></div>
+    </div>
+    <div class="legend" style="margin-top:14px">
+      <span class="grp"><span class="ttl">Age group</span>${AGES.map(g => `<span class="age ${g.toLowerCase()}">${g}</span><span class="muted">${AGE_RANGE[g]}</span>`).join(' ')}</span>
+      <span class="grp"><span class="ttl">Keterisian</span>
+        <span class="sw" style="background:var(--surface)"></span>0–59%
+        <span class="sw" style="background:var(--u2)"></span>60–99%
+        <span class="sw" style="background:var(--u3)"></span>Penuh
+        <span class="sw" style="background:var(--crit-bg)"></span>Lebih / slot kapasitas 0
+        <span class="sw" style="background:repeating-linear-gradient(135deg,var(--hatch) 0 4px,transparent 4px 8px),var(--surface)"></span>Tutup</span>
+    </div>
+    <div style="display:grid;gap:16px;margin-top:16px">${lanes.map(l => laneHTML(l, list.filter(s => s.lane===l))).join('')}</div>
+    <div style="margin-top:16px">${summaryHTML(list)}</div>`;
+  renderFoot();
+}
+
+function renderFoot(){
+  const parts = [];
+  if (data) parts.push(`<span>${fmtN(data.slots.length)} slot dibaca${data.source==='file' ? ' dari file CSV' : ''}${data.pulledAt ? ' · ditarik ' + esc(fmtTime(data.pulledAt)) : ''}.</span>`);
+  parts.push(`<span>Sumber: <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Slot Map (dari Exboard)</a>, yang mengambil tab Reguler Class Availability lewat IMPORTRANGE. Angka dihitung ulang setiap kali halaman ditarik.</span>`);
+  $('#foot').innerHTML = parts.join('');
+}
+
+/* ================= Tarik data ================= */
+function mcpErrText(err){
+  switch(err && err.code){
+    case 'server_not_connected': case 'server_not_found': return 'Google Drive belum tersambung untuk akun ini. Tambahkan atau sambungkan di claude.ai → Settings → Connectors, lalu klik Tarik ulang.';
+    case 'needs_reauth': return 'Sambungan Google Drive kedaluwarsa. Sambungkan ulang di claude.ai → Settings → Connectors, lalu klik Tarik ulang.';
+    case 'selection_required': return 'Ada lebih dari satu koneksi Google Drive. Pilih salah satu di jendela yang muncul, lalu klik Tarik ulang.';
+    case 'not_in_manifest': case 'consent_required': return 'Halaman ini belum diizinkan membaca Google Drive. Klik Tarik ulang lalu pilih Izinkan.';
+    case 'blocked_by_policy': case 'approval_required': return 'Kebijakan organisasi memblokir akses Google Drive dari halaman ini.';
+    case 'tool_error': return 'Google Drive menolak permintaan' + (err.message ? ': ' + err.message : '') + '. Pastikan Anda punya akses ke Sheet feed.';
+    case 'server_unavailable': return 'Google Drive sedang tidak merespons. Coba Tarik ulang sebentar lagi.';
+    case 'bad_payload': return 'Format jawaban Google Drive tidak dikenali.';
+    default: return 'Gagal membaca Sheet feed' + (err && err.message ? ': ' + err.message : '.');
+  }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function fetchFeed(mcp){
+  const input = {fileId: FEED_ID, exportMimeType: 'text/csv'};
+  let res;
+  try { res = await mcp.callTool(GDRIVE, 'download_file_content', input, {cache:false}); }
+  catch(err){
+    if (err && err.retryable){ await sleep(Math.min(err.retryAfterMs || 1500, 8000) + Math.random()*500); res = await mcp.callTool(GDRIVE, 'download_file_content', input, {cache:false}); }
+    else throw err;
+  }
+  let p = res.payload;
+  if (typeof p === 'string'){ try { p = JSON.parse(p); } catch(e){} }
+  const b64 = p && typeof p === 'object' ? p.content : null;
+  if (typeof b64 !== 'string') throw {code:'bad_payload'};
+  return b64ToText(b64);
+}
+function applyText(text, source){
+  const parsed = parseFeed(text);
+  if (!parsed.slots.length){
+    showErr(parsed.refErr
+      ? `<b>Sheet feed belum bisa membaca Exboard.</b> Buka <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Slot Map</a>, klik sel A1, lalu pilih "Allow access". Setelah itu klik Tarik ulang.`
+      : `<b>Tidak ada slot yang terbaca.</b> Pastikan Sheet feed berisi tab Reguler Class Availability dengan kolom Slot seperti "Baby - Lane 1 - Senin - 10:30".`);
+    return false;
+  }
+  data = {slots: parsed.slots, lost: parsed.lost, pulledAt: Date.now(), source};
+  showErr('');
+  lsSet(CACHE_KEY, {text, pulledAt: data.pulledAt, source});
+  return true;
+}
+async function pull(){
+  if (pulling) return;
+  let mcp = null;
+  if (window.claude && typeof window.claude.use === 'function'){ try { mcp = await window.claude.use('mcp'); } catch(e){ mcp = null; } }
+  if (!mcp){
+    $('#csvLabel').hidden = false; $('#pullBtn').hidden = true;
+    setStatus(data ? '' : 'err', data ? 'Data tersimpan · ' + fmtTime(data.pulledAt) : 'Tidak tersambung ke Drive');
+    if (!data) showErr(`<b>Halaman ini tidak bisa menarik Google Drive dari sini.</b> Buka dashboard lewat link claude.ai-nya, atau unduh <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Slot Map</a> sebagai CSV (File → Download → CSV) lalu klik Buka CSV.`);
+    render(); return;
+  }
+  pulling = true; $('#pullBtn').disabled = true; setStatus('busy', 'Menarik data…');
+  try {
+    const text = await fetchFeed(mcp);
+    if (applyText(text, 'drive')) setStatus('ok', 'Tersinkron · ' + fmtTime(data.pulledAt));
+    else setStatus('err', 'Feed belum siap');
+  } catch(err){
+    setStatus('err', 'Gagal menarik');
+    const msg = mcpErrText(err);
+    showErr(`<b>Data terbaru belum bisa ditarik.</b> ${esc(msg)}${data ? ` Menampilkan data terakhir (${esc(fmtTime(data.pulledAt))}).` : ''}`);
+  } finally { pulling = false; $('#pullBtn').disabled = false; render(); }
+}
+
+/* ================= Event ================= */
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-c]'); if (!b) return;
+  ui.center = b.dataset.c; lsSet(UI_KEY, ui); render();
+});
+$('#tabs').addEventListener('keydown', e => {
+  if (!['ArrowLeft','ArrowRight'].includes(e.key)) return;
+  const bs = Array.from(document.querySelectorAll('#tabs button')); const i = bs.findIndex(b => b.dataset.c===ui.center);
+  const n = bs[(i + (e.key==='ArrowRight' ? 1 : -1) + bs.length) % bs.length]; if (!n) return;
+  ui.center = n.dataset.c; lsSet(UI_KEY, ui); render(); document.querySelector(`#tabs button[data-c="${n.dataset.c}"]`).focus();
+});
+$('#pullBtn').addEventListener('click', pull);
+$('#csvFile').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const text = await f.text();
+  if (applyText(text, 'file')) setStatus('ok', 'Dari file · ' + fmtTime(data.pulledAt));
+  e.target.value = ''; render();
+});
+
+/* ================= Mulai ================= */
+const cached = lsGet(CACHE_KEY);
+if (cached && typeof cached.text === 'string'){
+  const p = parseFeed(cached.text);
+  if (p.slots.length){ data = {slots:p.slots, lost:p.lost, pulledAt:cached.pulledAt, source:cached.source}; setStatus('', 'Data tersimpan · ' + fmtTime(cached.pulledAt)); }
+}
+render();
+pull();
+})();
+</script>
