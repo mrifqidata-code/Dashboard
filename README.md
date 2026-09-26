@@ -36,5 +36,6 @@ Kalau dibuka lewat claude.ai (artifact), `slot-map/` tetap membaca lewat connect
   DP → FP hijau ≥80%, merah <70%).
 - Revenue di tab 02B Acquisition SA tercatat dalam ribuan rupiah; halaman SA mengalikannya ×1.000.
 - Warna di halaman SA: CVR / CVR Baby Tiny / Full Pay Rate hijau bila ≥ rata-rata area, merah bila 30% di bawahnya.
-- CVR Baby Tiny diambil dari kolom BT (bagian B tab 02B). Angka area-nya rata-rata SA, karena sheet tidak menyediakan pembaginya.
+- CVR Baby Tiny = (paid Baby + paid Tiny) / (show up Baby + show up Tiny), dari bagian B tab 02B
+  (paid per segmen = show up × CVR segmen). Kolom BT di sheet tidak dipakai karena pembaginya berbeda.
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.

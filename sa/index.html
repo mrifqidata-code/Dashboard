@@ -305,17 +305,23 @@ function parseFeed(text){
     if (name.toUpperCase()==='TOTAL'){ out.total = e; break; }
     out.sas.push(e);
   }
-  // B. ANALISA AGE GROUP: kolom BT = CVR Baby Tiny per SA, plus show up & CVR Baby (6-17 Mo) / Tiny (18-36 Mo)
-  const bi = rows.findIndex((r, i) => i > hi && norm(r[0])==='student advisor' && r.some(c => norm(c)==='bt'));
+  // B. ANALISA AGE GROUP: show up & CVR Baby (6-17 Mo) / Tiny (18-36 Mo).
+  // CVR Baby Tiny = (paid Baby + paid Tiny) / (SU Baby + SU Tiny); paid per segmen = SU × CVR segmen itu.
+  const bi = rows.findIndex((r, i) => i > hi && norm(r[0])==='student advisor' && r.some(c => norm(c)==='6-17 mo show up'));
   if (bi >= 0){
     const h = rows[bi].map(norm), at = name => h.indexOf(name);
-    const ix = {bt: at('bt'), suBaby: at('6-17 mo show up'), suTiny: at('18-36 mo show up'), cvrBaby: at('6-17 mo cvr'), cvrTiny: at('18-36 mo cvr')};
+    const ix = {suBaby: at('6-17 mo show up'), suTiny: at('18-36 mo show up'), cvrBaby: at('6-17 mo cvr'), cvrTiny: at('18-36 mo cvr')};
     const by = new Map(out.sas.map(s => [s.name.toLowerCase(), s]));
     for (const r of rows.slice(bi+1)){
       const name = (r[0]||'').trim();
       if (/^[A-Z]\.\s/.test(name) || name.toUpperCase()==='TOTAL') break;
       const s = by.get(name.toLowerCase()); if (!s) continue;
       Object.entries(ix).forEach(([k, j]) => { if (j >= 0) s[k] = sheetNum(r[j]); });
+      // "-" di CVR padahal ada show up = belum ada yang bayar (0)
+      const paid = (su, cvr) => su > 0 ? Math.round(su * (cvr || 0) / 100) : 0;
+      s.suBT = (s.suBaby || 0) + (s.suTiny || 0);
+      s.paidBT = paid(s.suBaby, s.cvrBaby) + paid(s.suTiny, s.cvrTiny);
+      s.bt = s.suBT > 0 ? s.paidBT / s.suBT * 100 : null;
     }
   }
   // C. SINYAL KUALITAS PITCHING: alasan gagal terbanyak per SA
@@ -368,9 +374,9 @@ const active = s => (s.showUp||0) > 0;
 function agg(list){
   const sum = k => list.reduce((a,s) => a + (s[k]||0), 0);
   const su = sum('showUp'), paid = sum('totalPaid'), full = sum('paidFull');
-  const bts = list.filter(s => s.bt!=null);
+  const suBT = sum('suBT'), paidBT = sum('paidBT');
   return {n:list.length, leads:sum('leads'), showUp:su, totalPaid:paid, paidFull:full, fpsd:sum('fpsd'), rev:sum('rev'),
-    bt: bts.length ? bts.reduce((a,s) => a + s.bt, 0)/bts.length : null, nBt: bts.length,
+    suBT, paidBT, bt: suBT > 0 ? paidBT/suBT*100 : null,
     cvr: su>0 ? paid/su*100 : null, fpr: paid>0 ? full/paid*100 : null};
 }
 // Warna hanya untuk rasio (CVR, CVR Baby Tiny, Full Pay Rate): hijau ≥ rata-rata area, merah < 70% rata-rata area
@@ -416,7 +422,7 @@ function render(){
   const scope = ui.center==='ALL' ? 'Semua center' : ui.center;
   const kpis = `<div class="kpis">
     <div class="kpi"><div class="k-label">CVR SU→Paid</div><div class="k-val">${fmtPct(t.cvr)}</div><div class="k-foot">${fmt(t.totalPaid,0)} paid / ${fmt(t.showUp,0)} show up</div></div>
-    <div class="kpi"><div class="k-label">CVR Baby Tiny</div><div class="k-val">${fmtPct(t.bt)}</div><div class="k-foot">rata-rata ${t.nBt} SA · 6–36 bln</div></div>
+    <div class="kpi"><div class="k-label">CVR Baby Tiny</div><div class="k-val">${fmtPct(t.bt)}</div><div class="k-foot">${fmt(t.paidBT,0)} paid / ${fmt(t.suBT,0)} show up · 6–36 bln</div></div>
     <div class="kpi"><div class="k-label">Full Pay Rate</div><div class="k-val">${fmtPct(t.fpr)}</div><div class="k-foot">${fmt(t.paidFull,0)} full / ${fmt(t.totalPaid,0)} paid</div></div>
     <div class="kpi"><div class="k-label">FP SD</div><div class="k-val">${fmt(t.fpsd,0)}</div><div class="k-foot">${on.length} SA aktif · ${scope}</div></div>
     <div class="kpi"><div class="k-label">Revenue</div><div class="k-val">${fmtRpS(t.rev)}</div><div class="k-foot">${on.length ? fmtRpS(t.rev/on.length) + ' per SA' : ''}</div></div>
