@@ -1,3 +1,16 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131d20" media="(prefers-color-scheme: dark)">
 <title>Slot Map Kelas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -73,6 +86,7 @@ h1,h2,h3{margin:0;line-height:1.2;text-wrap:balance;font-family:"Archivo","IBM P
 .btn{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 13px;border-radius:9px;border:1px solid var(--border-2);background:var(--surface);cursor:pointer;font-weight:600;font-size:13.5px;white-space:nowrap}
 .btn:hover{background:var(--surface-2)}
 .btn:disabled{opacity:.5;cursor:progress}
+.btn[hidden]{display:none}
 .btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .btn:focus-visible,.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -195,8 +209,24 @@ table.sum{width:100%;border-collapse:collapse;font-size:13.5px}
 .skel{height:220px;border-radius:14px;background:linear-gradient(90deg,var(--surface) 0,var(--surface-2) 50%,var(--surface) 100%);background-size:200% 100%;animation:sh 1.4s infinite linear;border:1px solid var(--border)}
 @keyframes sh{to{background-position:-200% 0}}
 @media (prefers-reduced-motion: reduce){.skel{animation:none}}
+/* App nav (Rekap / Slot Map): hanya tampil di versi aplikasi, bukan di claude.ai */
+.top{padding-top:env(safe-area-inset-top,0px)}
+.appnav{display:flex;gap:4px}
+.appnav[hidden]{display:none}
+.appnav a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;color:var(--ink-2);font-weight:600;font-size:14px;text-decoration:none}
+.appnav a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.appnav a:hover{background:var(--surface-2);color:var(--ink)}
+.appnav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.appnav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:899px){
+  body.has-appnav{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .appnav{position:fixed;left:0;right:0;bottom:0;z-index:30;gap:0;background:var(--surface);border-top:1px solid var(--border);padding:6px 6px calc(6px + env(safe-area-inset-bottom));justify-content:space-around}
+  .appnav a{flex:1;flex-direction:column;gap:2px;font-size:11.5px;padding:6px 2px}
+  .appnav a[aria-current="page"]{background:transparent}
+}
 </style>
-
+</head>
+<body>
 <header class="top">
   <div class="wrap top-inner">
     <div class="brand">
@@ -212,6 +242,10 @@ table.sum{width:100%;border-collapse:collapse;font-size:13.5px}
       <label class="btn" for="csvFile" id="csvLabel" hidden><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M4 21h16"/></svg>Buka CSV</label>
       <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
     </div>
+    <nav class="appnav" id="appnav" aria-label="Pilih dashboard" hidden>
+      <a href="../rekap/"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Rekap</a>
+      <a href="./" aria-current="page"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 4v16M16 4v16"/></svg>Slot Map</a>
+    </nav>
   </div>
 </header>
 
@@ -582,16 +616,44 @@ function applyText(text, source){
   lsSet(CACHE_KEY, {text, pulledAt: data.pulledAt, source});
   return true;
 }
+// Di luar claude.ai (versi aplikasi): Sheet yang dibagikan "siapa saja yang punya link" dibaca langsung.
+// export?format=csv membaca nilai apa adanya; gviz cadangan bila export diblokir.
+async function fetchPublicCsv(id){
+  const urls = [
+    `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
+    `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`
+  ];
+  let lastErr = null;
+  for (const u of urls){
+    try {
+      const r = await fetch(u, {cache:'no-store', credentials:'omit'});
+      if (!r.ok){ lastErr = {code:'http', status:r.status}; continue; }
+      const t = await r.text();
+      if (/^\s*<(!doctype|html)/i.test(t)){ lastErr = {code:'private'}; continue; }   // halaman login Google
+      return t;
+    } catch(e){ lastErr = {code: navigator.onLine === false ? 'offline' : 'blocked', message: e && e.message}; }
+  }
+  throw lastErr || {code:'blocked'};
+}
+async function pullPublic(){
+  pulling = true; $('#pullBtn').disabled = true; setStatus('busy', 'Menarik data…');
+  try {
+    const text = await fetchPublicCsv(FEED_ID);
+    if (applyText(text, 'sheet')) setStatus('ok', 'Tersinkron · ' + fmtTime(data.pulledAt));
+    else setStatus('err', 'Feed belum siap');
+  } catch(err){
+    $('#csvLabel').hidden = false;
+    setStatus('err', data ? 'Data ' + fmtTime(data.pulledAt) : 'Gagal menarik');
+    const why = err && err.code==='offline' ? 'HP sedang offline.'
+      : `Sheet feed belum bisa dibaca dari aplikasi ini. Pemilik Sheet perlu membuka <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Slot Map</a> → Bagikan → Akses umum → <b>Siapa saja yang memiliki link</b> (Viewer).`;
+    showErr(`<b>Data terbaru belum bisa ditarik.</b> ${why}${data ? ` Menampilkan data terakhir (${esc(fmtTime(data.pulledAt))}).` : ''}`);
+  } finally { pulling = false; $('#pullBtn').disabled = false; render(); }
+}
 async function pull(){
   if (pulling) return;
   let mcp = null;
   if (window.claude && typeof window.claude.use === 'function'){ try { mcp = await window.claude.use('mcp'); } catch(e){ mcp = null; } }
-  if (!mcp){
-    $('#csvLabel').hidden = false; $('#pullBtn').hidden = true;
-    setStatus(data ? '' : 'err', data ? 'Data tersimpan · ' + fmtTime(data.pulledAt) : 'Tidak tersambung ke Drive');
-    if (!data) showErr(`<b>Halaman ini tidak bisa menarik Google Drive dari sini.</b> Buka dashboard lewat link claude.ai-nya, atau unduh <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Slot Map</a> sebagai CSV (File → Download → CSV) lalu klik Buka CSV.`);
-    render(); return;
-  }
+  if (!mcp) return pullPublic();
   pulling = true; $('#pullBtn').disabled = true; setStatus('busy', 'Menarik data…');
   try {
     const text = await fetchFeed(mcp);
@@ -624,6 +686,16 @@ $('#csvFile').addEventListener('change', async e => {
 });
 
 /* ================= Mulai ================= */
+const inClaude = !!(window.claude && typeof window.claude.use === 'function');
+if (!inClaude){
+  // Versi aplikasi (GitHub Pages): tampilkan navigasi Rekap / Slot Map, ingat halaman terakhir, pasang service worker
+  $('#appnav').hidden = false; document.body.classList.add('has-appnav');
+  try { localStorage.setItem('dashboardApp.last', 'slot-map'); } catch(e){}
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && (!data || Date.now() - data.pulledAt > 5*60*1000)) pull();
+  });
+}
 const cached = lsGet(CACHE_KEY);
 if (cached && typeof cached.text === 'string'){
   const p = parseFeed(cached.text);
@@ -633,3 +705,5 @@ render();
 pull();
 })();
 </script>
+</body>
+</html>

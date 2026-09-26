@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rekap Mingguan Area</title>
+<meta name="description" content="Rekap mingguan acquisition, revenue, CVR dan DP → FP per center.">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<style>
+:root{
+  color-scheme: light;
+  --page:#f3f4f1; --surface:#ffffff; --surface-2:#f6f6f3; --ink:#0b0b0b; --ink-2:#52514e; --muted:#7d7b75;
+  --border:rgba(11,11,11,.10); --border-2:rgba(11,11,11,.18); --axis:#c3c2b7;
+  --accent:#1c5cab; --accent-ink:#ffffff; --accent-soft:#e7eefa;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --good-bg:#e4f4e4; --good-ink:#0a6b0a; --warn-bg:#fff2d3; --warn-ink:#7a5200; --crit-bg:#fbe6e6; --crit-ink:#a32626;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#8f8d86;
+    --border:rgba(255,255,255,.10); --border-2:rgba(255,255,255,.2); --axis:#44443f;
+    --accent:#5598e7; --accent-ink:#0b0b0b; --accent-soft:#1b2a3e;
+    --good-bg:#13301a; --good-ink:#74d874; --warn-bg:#3a2e10; --warn-ink:#f7c85a; --crit-bg:#3d1a1a; --crit-ink:#f39292;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#8f8d86;
+  --border:rgba(255,255,255,.10); --border-2:rgba(255,255,255,.2); --axis:#44443f;
+  --accent:#5598e7; --accent-ink:#0b0b0b; --accent-soft:#1b2a3e;
+  --good-bg:#13301a; --good-ink:#74d874; --warn-bg:#3a2e10; --warn-ink:#f7c85a; --crit-bg:#3d1a1a; --crit-ink:#f39292;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--page); color:var(--ink);
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom));
+}
+@media (min-width:900px){ body{padding-bottom:40px} }
+button,select{font:inherit;color:inherit}
+h1,h2{margin:0;line-height:1.25}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.muted{color:var(--muted)}
+
+/* Header */
+.top{background:var(--surface);border-bottom:1px solid var(--border);padding-top:env(safe-area-inset-top)}
+.top-inner{display:flex;align-items:center;gap:12px;min-height:60px}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:20px;height:20px;stroke:var(--accent-ink);fill:none;stroke-width:2;stroke-linecap:round}
+.brand{min-width:0;flex:1 1 auto}
+.brand h1{font-size:17px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand p{margin:0;font-size:12.5px;color:var(--ink-2)}
+.right{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
+.sync{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.sync.ok::before{background:var(--good)}
+.sync.busy::before{background:var(--warn)}
+.sync.err::before{background:var(--crit)}
+@media (max-width:480px){ .brand p{display:none} .sync{max-width:132px;overflow:hidden;text-overflow:ellipsis} }
+
+/* App nav (Rekap / Slot Map) */
+.appnav{display:flex;gap:4px}
+.appnav a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;color:var(--ink-2);font-weight:600;font-size:14px;text-decoration:none}
+.appnav a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.appnav a:hover{background:var(--surface-2);color:var(--ink)}
+.appnav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+@media (max-width:899px){
+  .appnav{position:fixed;left:0;right:0;bottom:0;z-index:30;gap:0;background:var(--surface);border-top:1px solid var(--border);padding:6px 6px calc(6px + env(safe-area-inset-bottom));justify-content:space-around}
+  .appnav a{flex:1;flex-direction:column;gap:2px;font-size:11.5px;padding:6px 2px}
+  .appnav a[aria-current="page"]{background:transparent}
+}
+
+/* Controls */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--border-2);background:var(--surface);cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{min-height:34px;padding:0 10px;font-size:13px}
+.btn.icon{width:40px;padding:0;font-size:20px;line-height:1;flex:none}
+.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+select{min-height:40px;border:1px solid var(--border-2);border-radius:10px;background:var(--surface);padding:8px 10px;font-size:16px;width:100%;min-width:0}
+select:focus,.btn:focus-visible,.appnav a:focus-visible,.trend th button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* Week bar */
+.weekbar{position:sticky;top:0;z-index:20;background:var(--page);border-bottom:1px solid var(--border)}
+.wb{display:flex;align-items:center;gap:8px;padding-top:10px;padding-bottom:10px}
+.wb select{flex:1 1 auto}
+.wb-nav{display:flex;align-items:center;gap:8px;flex:1 1 auto;max-width:460px;min-width:0}
+
+main{padding-top:16px}
+.notice{border-radius:12px;padding:12px 14px;font-size:13.5px;background:var(--warn-bg);color:var(--warn-ink);margin-bottom:14px}
+.notice.err{background:var(--crit-bg);color:var(--crit-ink)}
+.notice a{color:inherit;font-weight:700}
+.notice[hidden]{display:none}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:24px 0 12px;flex-wrap:wrap}
+.sec-head h2{font-size:16px;font-weight:650}
+.note{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+
+/* KPI tiles */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+@media (max-width:1100px){ .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:620px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow);min-width:0}
+.kpi .k-label{font-size:12.5px;color:var(--ink-2);font-weight:600}
+.kpi .k-val{font-size:24px;font-weight:700;letter-spacing:-.02em;margin:4px 0 6px;line-height:1.1;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .k-val small{font-size:14px;font-weight:600;color:var(--ink-2);letter-spacing:0}
+.kpi .k-foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+
+/* Badges: icon + label, not color alone */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px 2px 3px;border-radius:999px;font-size:12.5px;font-weight:650;white-space:nowrap;line-height:1.5}
+.badge i{font-style:normal;display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;font-size:10.5px;font-weight:800;color:#fff}
+.badge.g{background:var(--good-bg);color:var(--good-ink)} .badge.g i{background:var(--good)}
+.badge.y{background:var(--warn-bg);color:var(--warn-ink)} .badge.y i{background:var(--warn);color:#3a2a00}
+.badge.r{background:var(--crit-bg);color:var(--crit-ink)} .badge.r i{background:var(--crit)}
+.badge.n{background:var(--surface-2);color:var(--muted);padding-left:9px}
+.delta{font-size:12.5px;font-weight:600;white-space:nowrap}
+.delta.up{color:var(--good-ink)} .delta.down{color:var(--crit-ink)} .delta.flat{color:var(--muted)}
+
+/* Center cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+@media (max-width:360px){ .cards{grid-template-columns:1fr} }
+.ccard{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 16px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.ccard::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--stc,var(--border))}
+.ccard.g{--stc:var(--good)} .ccard.y{--stc:var(--warn)} .ccard.r{--stc:var(--crit)}
+.ccard.empty{background:transparent;border-style:dashed;box-shadow:none}
+.c-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.c-name{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;letter-spacing:.02em}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.mgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+.metric{display:flex;flex-direction:column;gap:4px;min-width:0}
+.metric .m-label{font-size:11.5px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.05em}
+.metric .m-val{font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.2;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.metric .m-val small{font-size:12.5px;font-weight:600;color:var(--ink-2);letter-spacing:0}
+.metric .m-row{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap}
+.bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:2px;position:relative}
+.bar span{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.bar .tick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink-2);border-radius:1px}
+.c-foot{font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--border);padding-top:10px;display:flex;gap:4px 14px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.c-foot b{color:var(--ink)}
+
+/* Trend table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+table.trend{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;min-width:640px}
+.trend th,.trend td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.trend tbody tr:last-child td{border-bottom:0}
+.trend thead th{font-size:12px;color:var(--ink-2);font-weight:650;background:var(--surface-2)}
+.trend th button{border:0;background:none;padding:2px 4px;border-radius:6px;cursor:pointer;font:inherit;color:inherit}
+.trend th.cur button{background:var(--accent);color:var(--accent-ink)}
+.trend .lbl{text-align:left;position:sticky;left:0;background:var(--surface);font-weight:700;z-index:1}
+.trend thead .lbl{background:var(--surface-2)}
+.trend tr.area td{font-weight:700;background:var(--surface-2)}
+.trend tr.area .lbl{background:var(--surface-2)}
+.trend td.g{color:var(--good-ink)} .trend td.y{color:var(--warn-ink)} .trend td.r{color:var(--crit-ink)}
+.trend td.g::before,.trend td.y::before,.trend td.r::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.trend td.g::before{background:var(--good)} .trend td.y::before{background:var(--warn)} .trend td.r::before{background:var(--crit)}
+.trend td.cur{box-shadow:inset 2px 0 0 var(--accent),inset -2px 0 0 var(--accent)}
+
+.empty-state{text-align:center;padding:40px 16px;border:1px dashed var(--border-2);border-radius:14px;background:var(--surface)}
+.empty-state h2{font-size:17px;margin-bottom:6px}
+.empty-state p{color:var(--ink-2);margin:0 auto;max-width:460px;font-size:14px}
+.skel{height:180px;border-radius:14px;margin-bottom:12px;background:linear-gradient(90deg,var(--surface) 0,var(--surface-2) 50%,var(--surface) 100%);background-size:200% 100%;animation:sh 1.4s infinite linear;border:1px solid var(--border)}
+@keyframes sh{to{background-position:-200% 0}}
+.foot{font-size:12.5px;color:var(--muted);margin:24px 0 8px;display:grid;gap:4px}
+.foot a{color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(10px);background:var(--ink);color:var(--page);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:600;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:50;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (min-width:900px){ .toast{bottom:28px} }
+@media (prefers-reduced-motion: reduce){ .toast{transition:none} .skel,.btn.spin svg{animation:none} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 16c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 20c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><circle cx="15" cy="6" r="2"/><path d="M5 12l4-4 3 2 4-1"/></svg></div>
+    <div class="brand">
+      <h1>Rekap Mingguan Area</h1>
+      <p>KLM · KWC · PML · BTU · TMP · HIB</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+    <nav class="appnav" aria-label="Pilih dashboard">
+      <a href="./" aria-current="page"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Rekap</a>
+      <a href="../slot-map/"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 4v16M16 4v16"/></svg>Slot Map</a>
+    </nav>
+  </div>
+</header>
+
+<div class="weekbar">
+  <div class="wrap wb">
+    <div class="wb-nav">
+      <button class="btn icon" id="wPrev" type="button" aria-label="Minggu sebelumnya">‹</button>
+      <select id="wSel" aria-label="Pilih minggu"></select>
+      <button class="btn icon" id="wNext" type="button" aria-label="Minggu berikutnya">›</button>
+    </div>
+    <button class="btn sm" id="wLatest" type="button">Terbaru</button>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="notice err" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= Konfigurasi ================= */
+// Sheet "Feed Rekap Mingguan Area (dari Exboard)": satu baris per center per minggu.
+// Agar bisa dibaca dari luar claude.ai, Sheet ini harus dibagikan "Siapa saja yang memiliki link" (Viewer).
+const FEED_ID = '122A4RyzPQQzyLU8Q8dpv8KYn7D6SBLJtn4BMlwnkQtc';
+const FEED_URL = `https://docs.google.com/spreadsheets/d/${FEED_ID}/edit`;
+const CENTERS = ['KLM','KWC','PML','BTU','TMP','HIB'];
+const CCOLOR = {KLM:'var(--s1)',KWC:'var(--s2)',PML:'var(--s3)',BTU:'var(--s4)',TMP:'var(--s5)',HIB:'var(--s6)'};
+// Threshold sama dengan bawaan dashboard Rekap Mingguan Area di claude.ai
+const TH = { acq:{green:100, red:90}, rev:{green:100, red:90}, cvr:{green:45, red:35}, dp:{green:80, red:70} };
+const ST = { g:{label:'Hijau', icon:'✓', rank:0, emoji:'🟢'}, y:{label:'Kuning', icon:'!', rank:1, emoji:'🟡'}, r:{label:'Merah', icon:'✕', rank:2, emoji:'🔴'} };
+const CACHE_KEY = 'rekapLite.cache.v1';
+const LAST_KEY = 'dashboardApp.last';
+const STALE_MS = 5 * 60 * 1000;      // tarik ulang otomatis saat app dibuka lagi setelah 5 menit
+const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const TREND_N = 8;
+
+/* ================= Util ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = (v, d=1) => (v==null || isNaN(v)) ? '—' : Number(v).toLocaleString('id-ID',{maximumFractionDigits:d});
+const fmtPct = (v, d=1) => (v==null || isNaN(v)) ? '—' : fmt(v,d) + '%';
+const round1 = v => Math.round(v*10)/10;
+const has = v => v!=null && v!=='' && isFinite(v);
+function fmtRpS(v){
+  if (v==null || isNaN(v)) return '—';
+  const a = Math.abs(v);
+  if (a >= 1e9) return 'Rp ' + fmt(v/1e9, 2) + ' M';
+  if (a >= 1e6) return 'Rp ' + fmt(v/1e6, 1) + ' jt';
+  if (a >= 1e3) return 'Rp ' + fmt(v/1e3, 0) + ' rb';
+  return 'Rp ' + fmt(v, 0);
+}
+function fmtTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+}
+function lsGet(k){ try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch(e){ return null; } }
+function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ISO week (Senin–Minggu) */
+function isoWeekUTC(t){
+  const d = new Date(t.getTime()), day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const y = d.getUTCFullYear();
+  return y + '-W' + String(Math.ceil(((d - Date.UTC(y,0,1)) / 86400000 + 1) / 7)).padStart(2,'0');
+}
+function mondayOf(key){
+  const [y,w] = key.split('-W').map(Number), jan4 = new Date(Date.UTC(y,0,4)), d = jan4.getUTCDay() || 7;
+  const mon = new Date(jan4.getTime()); mon.setUTCDate(jan4.getUTCDate() - d + 1 + (w-1)*7);
+  return mon;
+}
+function shiftWeek(key, n){ const m = mondayOf(key); m.setUTCDate(m.getUTCDate() + 7*n); return isoWeekUTC(m); }
+const weekNo = key => 'W' + key.split('-W')[1];
+function weekRange(key){
+  const a = mondayOf(key), b = new Date(a.getTime()); b.setUTCDate(b.getUTCDate()+6);
+  const d1=a.getUTCDate(), m1=a.getUTCMonth(), y1=a.getUTCFullYear(), d2=b.getUTCDate(), m2=b.getUTCMonth(), y2=b.getUTCFullYear();
+  if (y1!==y2) return `${d1} ${BULAN[m1]} ${y1} – ${d2} ${BULAN[m2]} ${y2}`;
+  if (m1!==m2) return `${d1} ${BULAN[m1]} – ${d2} ${BULAN[m2]} ${y2}`;
+  return `${d1}–${d2} ${BULAN[m2]} ${y2}`;
+}
+const CUR_WEEK = (() => { const n = new Date(); return isoWeekUTC(new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()))); })();
+const weekLabel = key => `${weekNo(key)} · ${weekRange(key)}${key===CUR_WEEK ? ' (berjalan)' : ''}`;
+
+/* ================= Baca feed ================= */
+function parseCSV(text){
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i=0; i<text.length; i++){
+    const ch = text[i];
+    if (q){
+      if (ch==='"'){ if (text[i+1]==='"'){ cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch==='"') q = true;
+    else if (ch===','){ row.push(cell); cell = ''; }
+    else if (ch==='\n'){ row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (ch!=='\r') cell += ch;
+  }
+  if (cell!=='' || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+// Angka dari CSV Sheets: "34.9", "34,9", "328553000", "328,553,000", "328.553.000"
+function sheetNum(s){
+  s = String(s==null?'':s).trim().replace(/\s|Rp|%/g,'');
+  if (s==='' || s[0]==='#') return null;
+  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  if (/^-?\d+,\d{1,2}$/.test(s)) return Number(s.replace(',', '.'));
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g,''));
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return Number(s.replace(/\./g,'').replace(',', '.'));
+  const n = Number(s); return isFinite(n) ? n : null;
+}
+// Kolom: Minggu, Senin, Center, Show Up, Paid DP, Paid Full, Acquisition, Target Acquisition, Revenue, Target Revenue, CVR %, DP to FP %
+function parseFeed(text){
+  const rows = parseCSV(text);
+  const hi = rows.findIndex(r => (r[0]||'').trim()==='Minggu' && (r[2]||'').trim()==='Center');
+  if (hi < 0) return {entries:[], refErr: /#REF!/.test(text), headerMissing:true};
+  const entries = []; let refErr = false;
+  for (const r of rows.slice(hi+1)){
+    const wk = (r[0]||'').trim(), c = (r[2]||'').trim().toUpperCase();
+    if (wk.startsWith('#')){ refErr = true; continue; }
+    if (!/^\d{4}-W\d{2}$/.test(wk) || !CENTERS.includes(c)) continue;
+    const [showUp, dp, full, acq, tgtA, rev, tgtR, cvr, dpfp] = [3,4,5,6,7,8,9,10,11].map(i => sheetNum(r[i]));
+    if ((showUp||0) + (acq||0) + (rev||0) <= 0) continue;     // minggu tanpa aktivitas
+    entries.push({center:c, week:wk, showUp, paidDp:dp, paidFull:full,
+      actual: acq||0, target: tgtA>0 ? tgtA : null,
+      cvr: showUp>0 ? cvr : null, dpfp: (acq||0)>0 ? dpfp : null,
+      rev, revTarget: tgtR>0 ? tgtR : null});
+  }
+  return {entries, refErr};
+}
+
+// Sheet yang dibagikan "siapa saja yang punya link" bisa dibaca langsung dari browser.
+// export?format=csv membaca nilai apa adanya; gviz cadangan bila export diblokir.
+async function fetchPublicCsv(id){
+  const urls = [
+    `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
+    `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`
+  ];
+  let lastErr = null;
+  for (const u of urls){
+    try {
+      const r = await fetch(u, {cache:'no-store', credentials:'omit'});
+      if (!r.ok){ lastErr = {code:'http', status:r.status}; continue; }
+      const t = await r.text();
+      if (/^\s*<(!doctype|html)/i.test(t)){ lastErr = {code:'private'}; continue; }   // halaman login Google
+      return t;
+    } catch(e){ lastErr = {code: navigator.onLine === false ? 'offline' : 'blocked', message: e && e.message}; }
+  }
+  throw lastErr || {code:'blocked'};
+}
+
+/* ================= Status ================= */
+const statusBy = (k, v) => (v==null || isNaN(v)) ? null : v>=TH[k].green ? 'g' : v>=TH[k].red ? 'y' : 'r';
+function worst(...s){ s = s.filter(Boolean); return s.length ? s.sort((a,b) => ST[b].rank - ST[a].rank)[0] : null; }
+function derive(e){
+  if (!e) return null;
+  const pct = e.target>0 ? e.actual/e.target*100 : null;
+  const revPct = (has(e.rev) && e.revTarget>0) ? e.rev/e.revTarget*100 : null;
+  const dp = has(e.dpfp) ? Number(e.dpfp) : null;
+  const sAcq = statusBy('acq', pct), sCvr = statusBy('cvr', e.cvr), sRev = statusBy('rev', revPct), sDp = statusBy('dp', dp);
+  return Object.assign({}, e, {pct, revPct, dp, sAcq, sCvr, sRev, sDp, sAll: worst(sAcq, sRev, sCvr, sDp)});
+}
+function badge(s, text){
+  if (!s) return `<span class="badge n">${esc(text||'—')}</span>`;
+  return `<span class="badge ${s}"><i aria-hidden="true">${ST[s].icon}</i>${esc(text||ST[s].label)}</span>`;
+}
+function delta(cur, prev){
+  if (cur==null || prev==null || isNaN(cur) || isNaN(prev)) return '';
+  const d = round1(cur - prev);
+  if (d===0) return `<span class="delta flat">= 0 pt</span>`;
+  return `<span class="delta ${d>0?'up':'down'}">${d>0?'▲ +':'▼ −'}${fmt(Math.abs(d))} pt</span>`;
+}
+const stColor = s => s==='g'?'var(--good)':s==='y'?'var(--warn)':s==='r'?'var(--crit)':'var(--axis)';
+function progressBar(pct, s){
+  if (pct==null) return '';
+  const max = 130, bw = Math.min(Math.max(pct,0), max)/max*100, tick = 100/max*100;
+  return `<div class="bar" aria-hidden="true"><span style="width:${bw}%;background:${stColor(s)}"></span><i class="tick" style="left:calc(${tick}% - 1px)"></i></div>`;
+}
+
+/* ================= State ================= */
+let idx = new Map(), weeks = [], data = null, week = null, pulling = false;
+const get = (c, w) => idx.get(c + '|' + w) || null;
+function setData(text, pulledAt){
+  const p = parseFeed(text);
+  if (!p.entries.length) return p;
+  idx = new Map(p.entries.map(e => [e.center + '|' + e.week, e]));
+  weeks = Array.from(new Set(p.entries.map(e => e.week))).sort().reverse();
+  data = {pulledAt, refErr: p.refErr};
+  if (!week || !weeks.includes(week)) week = defaultWeek();
+  return p;
+}
+function defaultWeek(){ return weeks.find(w => w <= CUR_WEEK) || weeks[0] || CUR_WEEK; }
+function weekRows(w){
+  const pw = shiftWeek(w, -1);
+  return CENTERS.map(c => ({center:c, e: derive(get(c, w)), p: derive(get(c, pw))}));
+}
+function areaTotals(rows){
+  const f = rows.filter(r => r.e);
+  if (!f.length) return null;
+  const withT = f.filter(r => r.e.target>0);
+  const act = f.reduce((a,r) => a + r.e.actual, 0), tgt = withT.reduce((a,r) => a + r.e.target, 0);
+  const pct = tgt>0 ? withT.reduce((a,r) => a + r.e.actual, 0)/tgt*100 : null;
+  const fc = f.filter(r => has(r.e.cvr)), cvr = fc.length ? fc.reduce((a,r) => a + Number(r.e.cvr), 0)/fc.length : null;
+  const fr = f.filter(r => r.e.revPct!=null);
+  const rev = fr.length ? fr.reduce((a,r) => a + r.e.rev, 0) : null, revT = fr.length ? fr.reduce((a,r) => a + r.e.revTarget, 0) : null;
+  const revPct = revT>0 ? rev/revT*100 : null;
+  const fd = f.filter(r => r.e.dp!=null), dp = fd.length ? fd.reduce((a,r) => a + r.e.dp, 0)/fd.length : null;
+  const showUp = f.reduce((a,r) => a + (r.e.showUp||0), 0);
+  const dist = {g:0,y:0,r:0}; f.forEach(r => r.e.sAll && dist[r.e.sAll]++);
+  return {n:f.length, act, tgt, pct, cvr, rev, revT, revPct, dp, showUp, dist,
+    sAcq:statusBy('acq', pct), sCvr:statusBy('cvr', cvr), sRev:statusBy('rev', revPct), sDp:statusBy('dp', dp)};
+}
+
+/* ================= Render ================= */
+function setStatus(kind, text){ const el = $('#status'); el.className = 'sync ' + kind; el.textContent = text; el.title = text; }
+function showErr(html){ const b = $('#errBox'); b.innerHTML = html || ''; b.hidden = !html; }
+
+function renderWeekbar(){
+  const sel = $('#wSel');
+  const list = weeks.length ? weeks : [CUR_WEEK];
+  sel.innerHTML = list.map(w => `<option value="${w}"${w===week?' selected':''}>${esc(weekLabel(w))}</option>`).join('');
+  const i = list.indexOf(week);
+  $('#wPrev').disabled = i < 0 || i >= list.length - 1;
+  $('#wNext').disabled = i <= 0;
+  $('#wLatest').disabled = !weeks.length || week === defaultWeek();
+}
+
+function render(){
+  renderWeekbar();
+  renderFoot();
+  const el = $('#view');
+  if (!data){ if (!pulling) el.innerHTML = `<div class="empty-state"><h2>Belum ada data</h2><p>Data belum pernah berhasil ditarik di perangkat ini. Periksa pesan di atas, lalu ketuk tombol tarik ulang.</p></div>`; return; }
+  const w = week, rows = weekRows(w), tot = areaTotals(rows), ptot = areaTotals(weekRows(shiftWeek(w,-1)));
+  const dP = (a, b) => ptot ? delta(a, b) : '';
+
+  const kpis = tot ? `<div class="kpis">
+    <div class="kpi"><div class="k-label">Acquisition area</div>
+      <div class="k-val">${fmt(tot.act,0)} <small>/ ${fmt(tot.tgt,1)}</small></div>
+      <div class="k-foot">${badge(tot.sAcq, fmtPct(tot.pct,0))}${dP(tot.pct, ptot&&ptot.pct)}</div></div>
+    <div class="kpi"><div class="k-label">Revenue area</div>
+      <div class="k-val">${tot.rev!=null ? fmtRpS(tot.rev) : '—'}</div>
+      <div class="k-foot">${tot.rev!=null ? `${badge(tot.sRev, fmtPct(tot.revPct,0))}<span>dari ${fmtRpS(tot.revT)}</span>${dP(tot.revPct, ptot&&ptot.revPct)}` : '<span class="muted">Belum ada data</span>'}</div></div>
+    <div class="kpi"><div class="k-label">Rata-rata CVR</div>
+      <div class="k-val">${fmtPct(tot.cvr)}</div>
+      <div class="k-foot">${badge(tot.sCvr)}${dP(tot.cvr, ptot&&ptot.cvr)}</div></div>
+    <div class="kpi"><div class="k-label">Rata-rata DP → FP</div>
+      <div class="k-val">${fmtPct(tot.dp)}</div>
+      <div class="k-foot">${tot.dp!=null ? badge(tot.sDp) + dP(tot.dp, ptot&&ptot.dp) : '<span class="muted">Belum ada data</span>'}</div></div>
+    <div class="kpi"><div class="k-label">Show up</div>
+      <div class="k-val">${fmt(tot.showUp,0)}</div>
+      <div class="k-foot">${ptot ? `<span>minggu lalu ${fmt(ptot.showUp,0)}</span>` : ''}</div></div>
+    <div class="kpi"><div class="k-label">Status center</div>
+      <div class="k-val">${tot.dist.r} <small>merah</small></div>
+      <div class="k-foot">${tot.dist.g?badge('g', tot.dist.g+' Hijau'):''}${tot.dist.y?badge('y', tot.dist.y+' Kuning'):''}${tot.dist.r?badge('r', tot.dist.r+' Merah'):''}</div></div>
+  </div>` : `<div class="empty-state"><h2>Belum ada data untuk ${esc(weekNo(w))}</h2><p>${esc(weekRange(w))}. Pilih minggu lain di atas.</p></div>`;
+
+  const metric = (label, val, b, bar, d) => `<div class="metric"><div class="m-label">${label}</div><div class="m-val">${val}</div><div class="m-row">${b}${d||''}</div>${bar||''}</div>`;
+  const cards = rows.map(r => {
+    const dot = `<span class="dot" style="background:${CCOLOR[r.center]}"></span>`;
+    if (!r.e) return `<div class="ccard empty"><div class="c-head"><div class="c-name">${dot}${r.center}</div>${badge(null,'Tidak ada aktivitas')}</div></div>`;
+    const e = r.e, p = r.p;
+    return `<article class="ccard ${e.sAll||''}">
+      <div class="c-head"><div class="c-name">${dot}${r.center}</div>${badge(e.sAll)}</div>
+      <div class="mgrid">
+        ${metric('Acquisition', `${fmt(e.actual,0)} <small>/ ${fmt(e.target,1)}</small>`, badge(e.sAcq, fmtPct(e.pct,0)), progressBar(e.pct, e.sAcq), delta(e.pct, p&&p.pct))}
+        ${metric('Revenue', e.revPct!=null ? `${fmtRpS(e.rev)} <small>/ ${fmtRpS(e.revTarget).replace('Rp ','')}</small>` : fmtRpS(e.rev), e.revPct!=null ? badge(e.sRev, fmtPct(e.revPct,0)) : badge(null,'Tanpa target'), progressBar(e.revPct, e.sRev), delta(e.revPct, p&&p.revPct))}
+        ${metric('CVR', fmtPct(e.cvr), badge(e.sCvr), '', delta(e.cvr, p&&p.cvr))}
+        ${metric('DP → FP', fmtPct(e.dp), e.dp!=null ? badge(e.sDp) : badge(null,'—'), '', delta(e.dp, p&&p.dp))}
+      </div>
+      <div class="c-foot"><span>Show up <b>${fmt(e.showUp,0)}</b></span><span>Paid DP <b>${fmt(e.paidDp,0)}</b></span><span>Paid Full <b>${fmt(e.paidFull,0)}</b></span></div>
+    </article>`;
+  }).join('');
+
+  el.innerHTML = `${kpis}
+    <div class="sec-head"><h2>Per center · ${esc(weekLabel(w))}</h2>
+      <button class="btn sm" id="copyBtn" type="button" ${tot?'':'disabled'}><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>Salin ringkasan (WA)</button>
+    </div>
+    <div class="cards">${cards}</div>
+    <p class="note">▲▼ = perubahan dibanding minggu sebelumnya (poin persen). Status center = yang terburuk dari Acquisition, Revenue, CVR, dan DP → FP.</p>
+    <div class="sec-head"><h2>Tren acquisition vs target · ${TREND_N} minggu</h2><span class="note" style="margin:0">Ketuk minggu untuk membukanya</span></div>
+    <div class="table-wrap">${trendTable(w)}</div>
+    <p class="note">Hijau ≥${TH.acq.green}% target, Kuning ${TH.acq.red}–${TH.acq.green}%, Merah &lt;${TH.acq.red}%. CVR: hijau ≥${TH.cvr.green}%, merah &lt;${TH.cvr.red}%. DP → FP: hijau ≥${TH.dp.green}%, merah &lt;${TH.dp.red}%.</p>`;
+  // Minggu terpilih ada di kolom paling kanan: geser tabel tren ke kanan agar langsung terlihat di HP
+  const tw = el.querySelector('.table-wrap'); if (tw) tw.scrollLeft = tw.scrollWidth;
+}
+
+function trendTable(end){
+  // ${TREND_N} minggu yang ada datanya, berakhir di minggu terpilih
+  const i = weeks.indexOf(end);
+  const ws = (i < 0 ? [] : weeks.slice(i, i + TREND_N)).reverse();
+  if (!ws.length) return '<p class="note" style="padding:12px">Belum ada data tren.</p>';
+  const cell = (e, w) => {
+    if (!e) return `<td class="${w===end?'cur':''}"><span class="muted">—</span></td>`;
+    return `<td class="${e.sAcq||''} ${w===end?'cur':''}" title="${esc(e.center||'Area')} ${weekNo(w)}: ${fmt(e.act!=null?e.act:e.actual,0)} / ${fmt(e.tgt!=null?e.tgt:e.target,1)}">${fmtPct(e.pct,0)}</td>`;
+  };
+  const head = ws.map(w => `<th class="${w===end?'cur':''}"><button type="button" data-week="${w}" title="${esc(weekRange(w))}">${weekNo(w)}</button></th>`).join('');
+  const body = CENTERS.map(c => `<tr><td class="lbl"><span class="dot" style="display:inline-block;margin-right:6px;background:${CCOLOR[c]}"></span>${c}</td>${ws.map(w => cell(derive(get(c,w)), w)).join('')}</tr>`).join('');
+  const area = `<tr class="area"><td class="lbl">Area</td>${ws.map(w => cell(areaTotals(weekRows(w)), w)).join('')}</tr>`;
+  return `<table class="trend"><thead><tr><th class="lbl">Center</th>${head}</tr></thead><tbody>${body}${area}</tbody></table>`;
+}
+
+function renderFoot(){
+  const parts = [];
+  if (data) parts.push(`<span>${fmt(idx.size,0)} baris center-minggu · ditarik ${esc(fmtTime(data.pulledAt))}${data.refErr ? ' · sebagian baris di Sheet masih #REF!' : ''}.</span>`);
+  parts.push(`<span>Sumber: <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Rekap Mingguan Area (dari Exboard)</a>. Catatan coaching SA/CM hanya ada di dashboard claude.ai.</span>`);
+  $('#foot').innerHTML = parts.join('');
+}
+
+function summaryText(){
+  const rows = weekRows(week), tot = areaTotals(rows);
+  if (!tot) return '';
+  const E = s => s ? ST[s].emoji : '⚪';
+  const lines = [`*Rekap Mingguan Area — ${weekNo(week)} (${weekRange(week)})*`,
+    `Acquisition: ${fmt(tot.act,0)}/${fmt(tot.tgt,1)} (${fmtPct(tot.pct,0)}) ${E(tot.sAcq)}`];
+  if (tot.rev!=null) lines.push(`Revenue: ${fmtRpS(tot.rev)}/${fmtRpS(tot.revT).replace('Rp ','')} (${fmtPct(tot.revPct,0)}) ${E(tot.sRev)}`);
+  lines.push(`Rata-rata CVR: ${fmtPct(tot.cvr)} ${E(tot.sCvr)}`);
+  if (tot.dp!=null) lines.push(`Rata-rata DP → FP: ${fmtPct(tot.dp)} ${E(tot.sDp)}`);
+  lines.push('');
+  rows.forEach(r => {
+    if (!r.e){ lines.push(`${r.center}: tidak ada aktivitas`); return; }
+    const e = r.e, parts = [`Acq ${fmt(e.actual,0)}/${fmt(e.target,1)} (${fmtPct(e.pct,0)}) ${E(e.sAcq)}`];
+    if (e.revPct!=null) parts.push(`Rev ${fmtRpS(e.rev)} (${fmtPct(e.revPct,0)}) ${E(e.sRev)}`);
+    parts.push(`CVR ${fmtPct(e.cvr)} ${E(e.sCvr)}`);
+    if (e.dp!=null) parts.push(`DP→FP ${fmtPct(e.dp)} ${E(e.sDp)}`);
+    lines.push(`${E(e.sAll)} *${r.center}* — ${parts.join(' | ')}`);
+  });
+  const attn = rows.filter(r => r.e && r.e.sAll==='r').map(r => {
+    const e = r.e, m = [e.sAcq==='r'?'Acq':'', e.sRev==='r'?'Revenue':'', e.sCvr==='r'?'CVR':'', e.sDp==='r'?'DP→FP':''].filter(Boolean);
+    return `${r.center} (${m.join(', ')})`;
+  });
+  if (attn.length) lines.push('', `Perlu perhatian: ${attn.join('; ')}`);
+  return lines.join('\n');
+}
+async function copyText(t){
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly',''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch(e2){}
+    ta.remove(); return ok;
+  }
+}
+
+/* ================= Tarik data ================= */
+function errText(err){
+  if (err && err.code==='offline') return 'HP sedang offline.';
+  return `Sheet feed belum bisa dibaca dari aplikasi ini. Pemilik Sheet perlu membuka <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Rekap Mingguan Area</a> → Bagikan → Akses umum → <b>Siapa saja yang memiliki link</b> (Viewer).`;
+}
+async function pull(){
+  if (pulling) return;
+  pulling = true; $('#pullBtn').disabled = true; $('#pullBtn').classList.add('spin');
+  setStatus('busy', 'Menarik data…');
+  try {
+    const text = await fetchPublicCsv(FEED_ID);
+    const now = Date.now(), p = setData(text, now);
+    if (!p.entries.length){
+      setStatus('err', 'Feed belum siap');
+      showErr(p.refErr ? `<b>Sheet feed belum bisa membaca Exboard.</b> Buka <a href="${FEED_URL}" target="_blank" rel="noopener">Sheet feed</a>, klik sel A1, lalu pilih "Allow access".`
+        : `<b>Tidak ada data mingguan yang terbaca.</b> Pastikan tab pertama Sheet feed berisi tabel dengan kolom Minggu dan Center.`);
+    } else {
+      lsSet(CACHE_KEY, {text, pulledAt: now});
+      setStatus('ok', 'Tersinkron · ' + fmtTime(now));
+      showErr('');
+    }
+  } catch(err){
+    setStatus('err', data ? 'Data ' + fmtTime(data.pulledAt) : 'Gagal menarik');
+    showErr(`<b>Data terbaru belum bisa ditarik.</b> ${errText(err)}${data ? ` Menampilkan data terakhir (${esc(fmtTime(data.pulledAt))}).` : ''}`);
+  } finally {
+    pulling = false; $('#pullBtn').disabled = false; $('#pullBtn').classList.remove('spin');
+    render();
+  }
+}
+
+/* ================= Event ================= */
+function setWeek(w){ if (!w || w===week) return; week = w; render(); window.scrollTo({top:0}); }
+$('#wSel').addEventListener('change', e => setWeek(e.target.value));
+$('#wPrev').addEventListener('click', () => { const i = weeks.indexOf(week); if (i >= 0 && i < weeks.length-1) setWeek(weeks[i+1]); });
+$('#wNext').addEventListener('click', () => { const i = weeks.indexOf(week); if (i > 0) setWeek(weeks[i-1]); });
+$('#wLatest').addEventListener('click', () => setWeek(defaultWeek()));
+$('#pullBtn').addEventListener('click', pull);
+$('#view').addEventListener('click', async e => {
+  const wb = e.target.closest('button[data-week]');
+  if (wb){ setWeek(wb.dataset.week); return; }
+  if (e.target.closest('#copyBtn')) toast(await copyText(summaryText()) ? 'Ringkasan disalin. Tempel di WhatsApp.' : 'Gagal menyalin ringkasan.');
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && (!data || Date.now() - data.pulledAt > STALE_MS)) pull();
+});
+
+/* ================= Mulai ================= */
+try { localStorage.setItem(LAST_KEY, 'rekap'); } catch(e){}
+const cached = lsGet(CACHE_KEY);
+if (cached && typeof cached.text === 'string' && setData(cached.text, cached.pulledAt).entries.length) setStatus('', 'Data ' + fmtTime(cached.pulledAt));
+render();
+pull();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
