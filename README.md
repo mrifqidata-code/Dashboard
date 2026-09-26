@@ -5,7 +5,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP:
 | Halaman | Isi | Sumber data |
 |---|---|---|
 | `rekap/` | Rekap Mingguan Area: acquisition, revenue, CVR, DP → FP per center, tren 8 minggu, salin ringkasan WA | Sheet **Feed Rekap Mingguan Area (dari Exboard)** |
-| `sa/` | Acquisition per SA: CVR SU→Paid, Full Pay Rate, FP SD, Revenue per Student Advisor, filter center, urutkan per metrik, detail funnel & alasan gagal | Sheet **Feed Acquisition SA (dari Exboard)** (tab 02B Acquisition SA) |
+| `sa/` | Acquisition per SA: CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue per Student Advisor, filter center, urutkan per metrik, detail funnel & alasan gagal | Sheet **Feed Acquisition SA (dari Exboard)** (tab 02B Acquisition SA) |
 | `slot-map/` | Slot Map Kelas: age group, keterisian & coach per slot | Sheet **Feed Slot Map (dari Exboard)** |
 
 `index.html` langsung membuka dashboard yang terakhir dilihat. Bisa dipasang ke home screen
@@ -35,5 +35,6 @@ Kalau dibuka lewat claude.ai (artifact), `slot-map/` tetap membaca lewat connect
 - Threshold status memakai nilai bawaan (Acquisition/Revenue hijau ≥100%, merah <90%; CVR hijau ≥45%, merah <35%;
   DP → FP hijau ≥80%, merah <70%).
 - Revenue di tab 02B Acquisition SA tercatat dalam ribuan rupiah; halaman SA mengalikannya ×1.000.
-- Warna di halaman SA: CVR / Full Pay Rate hijau bila ≥ rata-rata area, merah bila 30% di bawahnya.
+- Warna di halaman SA: CVR / CVR Baby Tiny / Full Pay Rate hijau bila ≥ rata-rata area, merah bila 30% di bawahnya.
+- CVR Baby Tiny diambil dari kolom BT (bagian B tab 02B). Angka area-nya rata-rata SA, karena sheet tidak menyediakan pembaginya.
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.

@@ -111,8 +111,8 @@ main{padding-top:16px}
 .note{font-size:12.5px;color:var(--muted);margin:8px 0 0}
 
 /* KPI */
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-@media (max-width:760px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:760px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .kpis .kpi:last-child{grid-column:1 / -1} }
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow);min-width:0}
 .kpi .k-label{font-size:12.5px;color:var(--ink-2);font-weight:600}
 .kpi .k-val{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:4px 0 4px;line-height:1.1;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
@@ -129,8 +129,8 @@ main{padding-top:16px}
 .ctr{font-size:11.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:0 6px;flex:none}
 .chev{margin-left:auto;width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;flex:none;transition:transform .15s}
 .sa.open .chev{transform:rotate(180deg)}
-.mets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px;margin-top:10px}
-@media (max-width:520px){ .mets{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.mets{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px 14px;margin-top:10px}
+@media (max-width:600px){ .mets{grid-template-columns:repeat(2,minmax(0,1fr))} .mets .met:last-child{grid-column:1 / -1} }
 .met{min-width:0}
 .met .ml{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
 .met .mv{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25;white-space:nowrap}
@@ -190,6 +190,7 @@ main{padding-top:16px}
       <select id="sortSel">
         <option value="rev">Revenue</option>
         <option value="cvr">CVR SU→Paid</option>
+        <option value="bt">CVR Baby Tiny</option>
         <option value="fpr">Full Pay Rate</option>
         <option value="fpsd">FP SD</option>
       </select>
@@ -221,6 +222,7 @@ const LAST_KEY = 'dashboardApp.last';
 const STALE_MS = 5 * 60 * 1000;
 const METRICS = {
   cvr:  {label:'CVR SU→Paid', short:'CVR SU→Paid'},
+  bt:   {label:'CVR Baby Tiny', short:'CVR Baby Tiny'},
   fpr:  {label:'Full Pay Rate', short:'Full Pay'},
   fpsd: {label:'FP SD', short:'FP SD'},
   rev:  {label:'Revenue', short:'Revenue'}
@@ -303,6 +305,19 @@ function parseFeed(text){
     if (name.toUpperCase()==='TOTAL'){ out.total = e; break; }
     out.sas.push(e);
   }
+  // B. ANALISA AGE GROUP: kolom BT = CVR Baby Tiny per SA, plus show up & CVR Baby (6-17 Mo) / Tiny (18-36 Mo)
+  const bi = rows.findIndex((r, i) => i > hi && norm(r[0])==='student advisor' && r.some(c => norm(c)==='bt'));
+  if (bi >= 0){
+    const h = rows[bi].map(norm), at = name => h.indexOf(name);
+    const ix = {bt: at('bt'), suBaby: at('6-17 mo show up'), suTiny: at('18-36 mo show up'), cvrBaby: at('6-17 mo cvr'), cvrTiny: at('18-36 mo cvr')};
+    const by = new Map(out.sas.map(s => [s.name.toLowerCase(), s]));
+    for (const r of rows.slice(bi+1)){
+      const name = (r[0]||'').trim();
+      if (/^[A-Z]\.\s/.test(name) || name.toUpperCase()==='TOTAL') break;
+      const s = by.get(name.toLowerCase()); if (!s) continue;
+      Object.entries(ix).forEach(([k, j]) => { if (j >= 0) s[k] = sheetNum(r[j]); });
+    }
+  }
   // C. SINYAL KUALITAS PITCHING: alasan gagal terbanyak per SA
   const ci = rows.findIndex((r, i) => i > hi && norm(r[0])==='student advisor' && r.some(c => norm(c)==='alasan gagal terbanyak'));
   if (ci >= 0){
@@ -353,12 +368,14 @@ const active = s => (s.showUp||0) > 0;
 function agg(list){
   const sum = k => list.reduce((a,s) => a + (s[k]||0), 0);
   const su = sum('showUp'), paid = sum('totalPaid'), full = sum('paidFull');
+  const bts = list.filter(s => s.bt!=null);
   return {n:list.length, leads:sum('leads'), showUp:su, totalPaid:paid, paidFull:full, fpsd:sum('fpsd'), rev:sum('rev'),
+    bt: bts.length ? bts.reduce((a,s) => a + s.bt, 0)/bts.length : null, nBt: bts.length,
     cvr: su>0 ? paid/su*100 : null, fpr: paid>0 ? full/paid*100 : null};
 }
-// Warna hanya untuk rasio (CVR, Full Pay Rate): hijau ≥ rata-rata area, merah < 70% rata-rata area
+// Warna hanya untuk rasio (CVR, CVR Baby Tiny, Full Pay Rate): hijau ≥ rata-rata area, merah < 70% rata-rata area
 function tone(k, v, ref){
-  if (v==null || ref==null || !(k==='cvr' || k==='fpr')) return '';
+  if (v==null || ref==null || !(k==='cvr' || k==='bt' || k==='fpr')) return '';
   return v >= ref ? 'g' : v < ref*LOW ? 'r' : '';
 }
 const mval = (k, v) => k==='rev' ? fmtRpS(v) : k==='fpsd' ? fmt(v,0) : fmtPct(v);
@@ -391,14 +408,15 @@ function render(){
   });
   const off = list.filter(s => !active(s));
   // Skala batang: nilai tertinggi di daftar ini (rasio pakai 100%)
-  const maxOf = key => key==='cvr' || key==='fpr' ? 100 : Math.max(1, ...on.map(s => s[key]||0));
-  const max = {cvr:maxOf('cvr'), fpr:maxOf('fpr'), fpsd:maxOf('fpsd'), rev:maxOf('rev')};
+  const maxOf = key => key==='cvr' || key==='bt' || key==='fpr' ? 100 : Math.max(1, ...on.map(s => s[key]||0));
+  const max = {cvr:maxOf('cvr'), bt:maxOf('bt'), fpr:maxOf('fpr'), fpsd:maxOf('fpsd'), rev:maxOf('rev')};
   const avgPerSa = key => on.length ? on.reduce((a,s)=>a+(s[key]||0),0)/on.length : null;
-  const ref = {cvr:area.cvr, fpr:area.fpr, fpsd:avgPerSa('fpsd'), rev:avgPerSa('rev')};
+  const ref = {cvr:area.cvr, bt:area.bt, fpr:area.fpr, fpsd:avgPerSa('fpsd'), rev:avgPerSa('rev')};
 
   const scope = ui.center==='ALL' ? 'Semua center' : ui.center;
   const kpis = `<div class="kpis">
     <div class="kpi"><div class="k-label">CVR SU→Paid</div><div class="k-val">${fmtPct(t.cvr)}</div><div class="k-foot">${fmt(t.totalPaid,0)} paid / ${fmt(t.showUp,0)} show up</div></div>
+    <div class="kpi"><div class="k-label">CVR Baby Tiny</div><div class="k-val">${fmtPct(t.bt)}</div><div class="k-foot">rata-rata ${t.nBt} SA · 6–36 bln</div></div>
     <div class="kpi"><div class="k-label">Full Pay Rate</div><div class="k-val">${fmtPct(t.fpr)}</div><div class="k-foot">${fmt(t.paidFull,0)} full / ${fmt(t.totalPaid,0)} paid</div></div>
     <div class="kpi"><div class="k-label">FP SD</div><div class="k-val">${fmt(t.fpsd,0)}</div><div class="k-foot">${on.length} SA aktif · ${scope}</div></div>
     <div class="kpi"><div class="k-label">Revenue</div><div class="k-val">${fmtRpS(t.rev)}</div><div class="k-foot">${on.length ? fmtRpS(t.rev/on.length) + ' per SA' : ''}</div></div>
@@ -417,7 +435,7 @@ function render(){
       <button type="button" class="sa-head" data-id="${esc(id)}" aria-expanded="${open}">
         <div class="sa-top"><span class="rank">${i+1}</span><span class="sa-name">${esc(s.name)}</span><span class="ctr">${esc(s.center)}</span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div>
-        <div class="mets">${['cvr','fpr','fpsd','rev'].map(key => met(s, key)).join('')}</div>
+        <div class="mets">${['cvr','bt','fpr','fpsd','rev'].map(key => met(s, key)).join('')}</div>
       </button>
       <div class="sa-body" ${open?'':'hidden'}>
         <dl class="facts">
@@ -430,6 +448,8 @@ function render(){
           <div><dt>SUNP</dt><dd>${fmt(s.sunp,0)} <small>${fmtPct(s.sunpRate)} SU</small></dd></div>
           <div><dt>Rev / show up</dt><dd>${fmtRpS(s.revPerSu)}</dd></div>
           <div><dt>Revenue</dt><dd>${fmtRp(s.rev)}</dd></div>
+          <div><dt>Baby (6–17 bln)</dt><dd>${fmt(s.suBaby,0)} SU <small>${fmtPct(s.cvrBaby)}</small></dd></div>
+          <div><dt>Tiny (18–36 bln)</dt><dd>${fmt(s.suTiny,0)} SU <small>${fmtPct(s.cvrTiny)}</small></dd></div>
           ${s.engaged!=null?`<div><dt>Parent engaged</dt><dd>${fmtPct(s.engaged)}</dd></div>`:''}
         </dl>
         ${s.topReason?`<p class="why">Alasan gagal terbanyak: <b>${esc(s.topReason)}</b></p>`:''}
@@ -442,7 +462,7 @@ function render(){
     <div class="sec-head"><h2>Peringkat SA · ${esc(METRICS[k].label)}</h2><span class="note" style="margin:0">Ketuk nama SA untuk detail</span></div>
     <div class="list">${on.length ? on.map(card).join('') : '<div class="empty-state"><p>Belum ada SA dengan show up di center ini.</p></div>'}</div>
     <div class="legend">
-      <span><i style="background:var(--good-ink)"></i>Hijau: CVR / Full Pay Rate ≥ rata-rata area (${fmtPct(area.cvr)} / ${fmtPct(area.fpr)})</span>
+      <span><i style="background:var(--good-ink)"></i>Hijau: ≥ rata-rata area (CVR ${fmtPct(area.cvr)} · Baby Tiny ${fmtPct(area.bt)} · Full Pay ${fmtPct(area.fpr)})</span>
       <span><i style="background:var(--crit-ink)"></i>Merah: 30% di bawah rata-rata area</span>
       <span><i style="background:var(--ink-2);width:2px;height:12px;border-radius:1px"></i>Garis = rata-rata area (FP SD & Revenue: rata-rata per SA)</span>
     </div>
