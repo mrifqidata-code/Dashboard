@@ -21,8 +21,8 @@ from openpyxl.worksheet.datavalidation import DataValidation
 CENTERS = ["KLM", "KWC", "PML", "TMP", "BTU", "HIB"]
 CENTER_NAME = {"KLM": "Kalimalang", "KWC": "Karawaci", "PML": "Pamulang", "TMP": "TMP", "BTU": "BTU", "HIB": "HIB"}
 DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
-AGES = ["Baby", "Tiny", "Little", "Kids"]
-AGE_RANGE = {"Baby": "6–17 bulan", "Tiny": "18–36 bulan", "Little": "3–5 tahun", "Kids": "5–8+ tahun"}
+AGES = ["Baby", "Tiny", "Little", "Kids", "Star"]
+AGE_RANGE = {"Baby": "6–17 bulan", "Tiny": "18–36 bulan", "Little": "3–5 tahun", "Kids": "5–8+ tahun", "Star": ""}
 SESSION_GAP_MIN = 45  # dua sesi dianggap bentrok bila jaraknya < 45 menit
 DECISIONS = ["Jual minggu ini", "Buka kelas baru", "Ganti age group", "Tahan", "Tutup slot"]
 
@@ -42,7 +42,7 @@ STATUS_FILL = {
     "Lebih kapasitas": "E2D4F5",
     "Tutup": "E4E4E4",
 }
-AGE_FILL = {"Baby": "F7DBE6", "Tiny": "FDE7C4", "Little": "D6EFDC", "Kids": "DBE4FB"}
+AGE_FILL = {"Baby": "F7DBE6", "Tiny": "FDE7C4", "Little": "D6EFDC", "Kids": "DBE4FB", "Star": "F1E2FA"}
 thin = Side(style="thin", color="D5DDDF")
 BORDER = Border(left=thin, right=thin, top=thin, bottom=thin)
 
@@ -97,30 +97,65 @@ def norm_coach(s):
     return title_case(s)
 
 
+HEAD_MATCH = {
+    "age": lambda h: re.fullmatch(r"age\s*group", h), "slot": lambda h: h == "slot",
+    "cap": lambda h: re.fullmatch(r"cap(acity|asitas)?", h), "used": lambda h: h in ("used", "terisi"),
+    "avail": lambda h: h.startswith("availab"), "asst": lambda h: "asst" in h or "assist" in h,
+    "coach": lambda h: h == "coach",
+}
+DEFAULT_COLS = {"age": 1, "slot": 4, "cap": 5, "used": 6, "avail": 7, "coach": 8, "asst": None, "end": 9}
+
+
+def header_cols(r):
+    cols, end = {}, len(r)
+    for k, raw in enumerate(r[:20]):
+        h = clean(raw).lower().replace(".", "")
+        if k > 0 and h == "center":
+            end = k
+            break
+        for f, test in HEAD_MATCH.items():
+            if f not in cols and test(h):
+                cols[f] = k
+        if (h == "sesi" or h.startswith("key")) and "coach" in cols:
+            end = min(end, k)
+    if "slot" not in cols or "cap" not in cols:
+        return None
+    cols.setdefault("asst", None)
+    cols["end"] = end
+    return cols
+
+
 def parse_feed(path):
-    """Sama dengan parser dashboard: deteksi pergeseran kolom dari posisi kolom Slot."""
-    slots = []
+    """Sama dengan parser dashboard: posisi kolom dari header; pergeseran per baris dari posisi kolom Slot."""
+    slots, cols = [], dict(DEFAULT_COLS)
     with open(path, encoding="utf-8") as fh:
         for r in csv.reader(fh):
-            center = clean(r[0] if r else "").upper()
-            if not re.fullmatch(r"[A-Z]{2,5}", center) or center == "CENTER":
+            first = clean(r[0] if r else "")
+            if first.lower() == "center":
+                hc = header_cols(r)
+                if hc:
+                    cols = hc
+                continue
+            center = first.upper()
+            if not re.fullmatch(r"[A-Z]{2,5}", center):
                 continue
             j, m = -1, None
-            for k in range(1, min(10, len(r))):
+            for k in range(1, min(cols["slot"] + 7, len(r))):
                 mm = SLOT_RE.match(clean(r[k]))
                 if mm:
                     j, m = k, mm
                     break
-            if j < 4:
+            if not m:
                 continue
-            shift = j - 4
+            shift = j - cols["slot"]
 
             def get(f):
-                pos = 1 + shift + f
-                if pos <= 8:
-                    return r[pos] if pos < len(r) else ""
-                w = pos - 10
-                return r[w] if w >= 1 else None
+                if cols.get(f) is None:
+                    return ""
+                pos = cols[f] + shift
+                if pos < 1 or pos >= len(r) or (shift and pos >= cols["end"]):
+                    return None
+                return r[pos]
 
             day = next((d for d in DAYS if d.lower() == m[3].lower()), None)
             if not day:
@@ -128,9 +163,9 @@ def parse_feed(path):
             slots.append({
                 "center": center, "lane": int(m[2]), "day": day,
                 "time": f"{int(m[4]):02d}:{m[5]}",
-                "age": norm_age(re.sub(r"-\s*$", "", m[1])) or norm_age(get(F["age"])),
-                "cap": cell_num(get(F["cap"])), "used": cell_num(get(F["used"])),
-                "coach": norm_coach(get(F["coach"])),
+                "age": norm_age(re.sub(r"-\s*$", "", m[1])) or norm_age(get("age")),
+                "cap": cell_num(get("cap")), "used": cell_num(get("used")),
+                "coach": norm_coach(get("coach")), "asst": norm_coach(get("asst")),
             })
     return slots
 
@@ -140,7 +175,7 @@ def status_of(s):
     if cap is None or used is None:
         return "Data tidak lengkap"
     if cap == 0 and used == 0:
-        return "Tutup" if (age or coach) else "Tidak dibuka"
+        return "Tutup" if (age or coach or s.get("asst")) else "Tidak dibuka"
     if used > cap:
         return "Lebih kapasitas"
     if used == cap:
@@ -160,14 +195,16 @@ def coach_book(slots):
     """Per center: jadwal tiap coach (hari -> set menit), age group yang diajar."""
     book = defaultdict(lambda: defaultdict(lambda: {"busy": defaultdict(set), "ages": set(), "sessions": 0, "name": ""}))
     for s in slots:
-        if not s["coach"]:
-            continue
-        c = book[s["center"]][s["coach"].lower()]
-        c["name"] = s["coach"]
-        c["busy"][s["day"]].add(minutes(s["time"]))
-        if s["age"]:
-            c["ages"].add(s["age"])
-        c["sessions"] += 1
+        for role in ("coach", "asst"):
+            if not s.get(role):
+                continue
+            c = book[s["center"]][s[role].lower()]
+            c["name"] = c["name"] or s[role]
+            c["busy"][s["day"]].add(minutes(s["time"]))
+            if s["age"]:
+                c["ages"].add(s["age"])
+            c["sessions"] += 1
+            c["assist"] = c.get("assist", 0) + (role == "asst")
     return book
 
 
@@ -203,8 +240,8 @@ def build(slots, out_path, week_label, asof):
     md = wb.active
     md.title = "Master Data"
     headers = ["Key", "Center", "Lane", "Hari", "Jam", "Age Group", "Kapasitas", "Terisi",
-               "Sisa Kursi", "Utilisasi", "Coach", "Status", "Label Slot Map"]
-    widths = [22, 8, 6, 9, 7, 11, 10, 8, 10, 10, 14, 16, 30]
+               "Sisa Kursi", "Utilisasi", "Coach", "Status", "Label Slot Map", "Asst. Coach"]
+    widths = [22, 8, 6, 9, 7, 11, 10, 8, 10, 10, 14, 16, 30, 14]
     md.append(headers)
     for i, w in enumerate(widths, 1):
         md.column_dimensions[get_column_letter(i)].width = w
@@ -222,22 +259,23 @@ def build(slots, out_path, week_label, asof):
             f'=IF(AND(ISNUMBER(G{i}),ISNUMBER(H{i})),MAX(G{i}-H{i},0),"")',
             f'=IF(AND(ISNUMBER(G{i}),ISNUMBER(H{i})),IF(G{i}>0,H{i}/G{i},""),"")',
             s["coach"] or None,
-            (f'=IF(OR(G{i}="",H{i}=""),"Data tidak lengkap",IF(AND(G{i}=0,H{i}=0),IF(AND(F{i}="",K{i}=""),"Tidak dibuka","Tutup"),'
+            (f'=IF(OR(G{i}="",H{i}=""),"Data tidak lengkap",IF(AND(G{i}=0,H{i}=0),IF(AND(F{i}="",K{i}="",N{i}=""),"Tidak dibuka","Tutup"),'
              f'IF(H{i}>G{i},"Lebih kapasitas",IF(H{i}=G{i},"Penuh",IF(H{i}=0,IF(F{i}="","Slot kosong","Belum terisi"),"Sebagian")))))'),
             (f'=IF(L{i}="Tidak dibuka","–",IF(F{i}="","(tanpa age group)",F{i})&"  "&IF(H{i}="","?",H{i})&"/"&IF(G{i}="","?",G{i})'
-             f'&CHAR(10)&IF(K{i}="","coach: –","coach: "&K{i}))'),
+             f'&CHAR(10)&IF(K{i}="","coach: –","coach: "&K{i})&IF(N{i}="","",CHAR(10)&"asst: "&N{i}))'),
+            s.get("asst") or None,
         ])
         md.cell(i, 10).number_format = "0%"
     last_md = len(slots_sorted) + 1
     for row in md.iter_rows(min_row=2, max_row=last_md):
         for c in row:
             c.font = font(size=9)
-    for col in (6, 7, 8, 11):   # kolom input dari sumber
+    for col in (6, 7, 8, 11, 14):   # kolom input dari sumber
         for r in range(2, last_md + 1):
             md.cell(r, col).font = font(size=9, color="0000FF")
     md.freeze_panes = "B2"
-    md.auto_filter.ref = f"A1:M{last_md}"
-    md.cell(1, 7).comment = Comment("Kapasitas, Terisi, Age Group dan Coach disalin dari Exboard › Reguler Class Availability. "
+    md.auto_filter.ref = f"A1:N{last_md}"
+    md.cell(1, 7).comment = Comment("Kapasitas, Terisi, Age Group, Coach dan Asst. Coach disalin dari Exboard › Reguler Class Availability. "
                                     "Kolom lain dihitung dengan rumus.", "Working sheet")
     M = "'Master Data'"
     rng = lambda col: f"{M}!${col}$2:${col}${last_md}"
@@ -503,7 +541,7 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
                 c.border = BORDER
                 hc = ws.cell(r, HELP0 + i, f'=IFERROR(INDEX({rng("L")},MATCH({key},{rng("A")},0)),"")')
                 hc.font = font(size=8, color=C_MUTED)
-            ws.row_dimensions[r].height = 30
+            ws.row_dimensions[r].height = 40
             r += 1
         grid_ranges.append((top, r - 1))
         r += 1
@@ -548,6 +586,7 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
     for n, s in enumerate(todo, 1):
         key = f'$B$3&"|"&D{r}&"|"&B{r}&"|"&C{r}'
         avail, _ = available_coaches(book_c, s["day"], s["time"], exclude=s["coach"])
+        avail = [c for c in avail if c["name"].lower() != (s.get("asst") or "").lower()]
         avail_txt = "; ".join(f'{c["name"]} ({ages_str(c["ages"]) or "–"})' for c in avail[:6])
         if len(avail) > 6:
             avail_txt += f"; +{len(avail) - 6} lainnya"
@@ -562,7 +601,7 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
                f'=IFERROR(INDEX({rng("L")},MATCH({key},{rng("A")},0)),"")',
                f'=IFERROR(INDEX({rng("F")},MATCH({key},{rng("A")},0))&"","")',
                f'=IFERROR(INDEX({rng("G")},MATCH({key},{rng("A")},0)),"")',
-               f'=IFERROR(INDEX({rng("K")},MATCH({key},{rng("A")},0))&"","")',
+               f'=IFERROR(INDEX({rng("K")},MATCH({key},{rng("A")},0))&IF(INDEX({rng("N")},MATCH({key},{rng("A")},0))="",""," + asst "&INDEX({rng("N")},MATCH({key},{rng("A")},0))),"")',
                avail_txt or "Tidak ada coach lain yang bertugas & kosong",
                ages_str(pool) or "–",
                None, None, None, None, None]
@@ -603,9 +642,9 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
     for c in range(1, 15):
         ws.cell(r, c).fill = fill(C_ACCENT)
     r += 1
-    ws.cell(r, 1, "Angka = jumlah sesi coach per hari (dihitung dari Master Data). Dipakai untuk memilih coach PIC.").font = font(size=9, color=C_MUTED, italic=True)
+    ws.cell(r, 1, "Angka per hari = jumlah sesi (sebagai coach + assist). Dipakai untuk memilih coach PIC.").font = font(size=9, color=C_MUTED, italic=True)
     r += 1
-    ch = ["No", "Coach", "Age group diajar"] + DAYS + ["Total sesi", "Jam pertama–terakhir"]
+    ch = ["No", "Coach", "Age group diajar"] + DAYS + ["Sesi coach", "Sesi assist", "Jam pertama–terakhir"]
     for i, h in enumerate(ch):
         c = ws.cell(r, 1 + i, h)
         c.font = font(True, 9, "FFFFFF")
@@ -622,10 +661,12 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
         ws.cell(r, 2, cinfo["name"])
         ws.cell(r, 3, ages_str(cinfo["ages"]) or "–")
         for i, d in enumerate(DAYS):
-            ws.cell(r, 4 + i, f'=COUNTIFS({rng("B")},$B$3,{rng("K")},$B{r},{rng("D")},{get_column_letter(4+i)}${c_first-1})')
-        ws.cell(r, 11, f"=SUM(D{r}:J{r})")
-        ws.cell(r, 12, span)
-        for col in range(1, 13):
+            ws.cell(r, 4 + i, f'=COUNTIFS({rng("B")},$B$3,{rng("K")},$B{r},{rng("D")},{get_column_letter(4+i)}${c_first-1})'
+                                 f'+COUNTIFS({rng("B")},$B$3,{rng("N")},$B{r},{rng("D")},{get_column_letter(4+i)}${c_first-1})')
+        ws.cell(r, 11, f'=COUNTIFS({rng("B")},$B$3,{rng("K")},$B{r})')
+        ws.cell(r, 12, f'=COUNTIFS({rng("B")},$B$3,{rng("N")},$B{r})')
+        ws.cell(r, 13, span)
+        for col in range(1, 14):
             cell = ws.cell(r, col)
             cell.font = font(size=9, bold=(col == 2))
             cell.border = BORDER

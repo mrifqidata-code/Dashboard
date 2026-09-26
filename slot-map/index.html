@@ -13,7 +13,7 @@
   --warn:#d99a1e; --warn-bg:#fff2d6; --warn-ink:#7a5200;
   --good-ink:#0d6b3a;
   --baby:#f7dbe6; --baby-ink:#8a2a53; --tiny:#fde7c4; --tiny-ink:#7c4a05;
-  --little:#d6efdc; --little-ink:#1d6337; --kids:#dbe4fb; --kids-ink:#27449a; --other:#ece9f7; --other-ink:#4b3f86;
+  --little:#d6efdc; --little-ink:#1d6337; --kids:#dbe4fb; --kids-ink:#27449a; --star:#f1e2fa; --star-ink:#6d2a8c; --other:#ece9f7; --other-ink:#4b3f86;
   --hatch:rgba(15,29,34,.06);
   --shadow:0 1px 2px rgba(15,29,34,.05),0 6px 18px rgba(15,29,34,.05);
 }
@@ -28,7 +28,7 @@
     --warn:#e0a934; --warn-bg:#3a2d10; --warn-ink:#f2c86a;
     --good-ink:#7fd6a3;
     --baby:#452032; --baby-ink:#f3b3cd; --tiny:#43310f; --tiny-ink:#f6cf8c;
-    --little:#193826; --little-ink:#9bdcb0; --kids:#1e2a4d; --kids-ink:#adc0f5; --other:#2a2546; --other-ink:#c8bff0;
+    --little:#193826; --little-ink:#9bdcb0; --kids:#1e2a4d; --kids-ink:#adc0f5; --star:#34203f; --star-ink:#dcb4f0; --other:#2a2546; --other-ink:#c8bff0;
     --hatch:rgba(234,242,243,.06);
     --shadow:0 1px 2px rgba(0,0,0,.4);
   }
@@ -43,7 +43,7 @@
   --warn:#e0a934; --warn-bg:#3a2d10; --warn-ink:#f2c86a;
   --good-ink:#7fd6a3;
   --baby:#452032; --baby-ink:#f3b3cd; --tiny:#43310f; --tiny-ink:#f6cf8c;
-  --little:#193826; --little-ink:#9bdcb0; --kids:#1e2a4d; --kids-ink:#adc0f5; --other:#2a2546; --other-ink:#c8bff0;
+  --little:#193826; --little-ink:#9bdcb0; --kids:#1e2a4d; --kids-ink:#adc0f5; --star:#34203f; --star-ink:#dcb4f0; --other:#2a2546; --other-ink:#c8bff0;
   --hatch:rgba(234,242,243,.06);
   --shadow:0 1px 2px rgba(0,0,0,.4);
 }
@@ -119,6 +119,7 @@ main{padding-block:18px 48px;display:grid;gap:18px}
 .age.tiny{background:var(--tiny);color:var(--tiny-ink)}
 .age.little{background:var(--little);color:var(--little-ink)}
 .age.kids{background:var(--kids);color:var(--kids-ink)}
+.age.star{background:var(--star);color:var(--star-ink)}
 .age.none{background:transparent;color:var(--muted);border:1px dashed var(--border-2);font-weight:600}
 
 /* Lane */
@@ -141,7 +142,7 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;
 .grid tfoot b{color:var(--ink)}
 
 /* Cell */
-td.c{padding:7px 8px;vertical-align:top;background:var(--surface);height:78px}
+td.c{padding:7px 8px;vertical-align:top;background:var(--surface);height:92px}
 td.c.b-mid{background:var(--u1)}
 td.c.b-high{background:var(--u2)}
 td.c.b-full{background:var(--u3)}
@@ -161,6 +162,8 @@ td.c.b-void{background:var(--surface)}
 .c-coach{margin-top:5px;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
 .c-coach svg{width:12px;height:12px;flex:none;stroke:var(--muted);fill:none;stroke-width:2}
 .c-coach.na{color:var(--muted);font-weight:500;font-style:italic}
+.c-coach.asst{margin-top:2px;font-weight:500;color:var(--ink-2)}
+.c-coach .role{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);flex:none}
 .c-empty{color:var(--muted);font-size:12px;padding-top:2px}
 .tag{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 5px}
 .tag.full{background:var(--u4);color:var(--u4-ink)}
@@ -240,13 +243,11 @@ const GDRIVE = 'Google Drive';
 const CENTERS = ['KLM','KWC','PML','TMP','BTU','HIB'];
 const DAYS = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
 const DAY_ABBR = ['S','S','R','K','J','S','M'];
-const AGES = ['Baby','Tiny','Little','Kids'];
-const AGE_RANGE = {Baby:'6–17 bln', Tiny:'18–36 bln', Little:'3–5 th', Kids:'5–8+ th'};
+const AGES = ['Baby','Tiny','Little','Kids','Star'];
+const AGE_RANGE = {Baby:'6–17 bln', Tiny:'18–36 bln', Little:'3–5 th', Kids:'5–8+ th', Star:''};
 const CACHE_KEY = 'slotMapKelas.cache.v1';
 const UI_KEY = 'slotMapKelas.ui.v1';
-// Kolom data di tab Reguler Class Availability (B..I), urutan normal:
-const F = {age:0, day:1, time:2, slot:3, cap:4, used:5, avail:6, coach:7};
-const FIELD_LABEL = {cap:'kapasitas', used:'jumlah terisi', avail:'status availability', coach:'coach'};
+const FIELD_LABEL = {cap:'kapasitas', used:'jumlah terisi', avail:'status availability', coach:'coach', asst:'assist coach'};
 
 /* ================= Util ================= */
 const $ = s => document.querySelector(s);
@@ -306,53 +307,76 @@ function normCoach(s){
 
 /* ================= Parser =================
    Satu baris = satu slot. Kolom "Slot" berisi "Baby - Lane 1 - Senin - 10:30".
-   Di Exboard saat ini blok Lane 2–5 bergeser (Lane n bergeser n-1 kolom ke kanan, sisanya
-   terlipat ke kolom B). Posisi kolom Slot dipakai untuk mendeteksi pergeseran itu, sehingga
-   data tetap terbaca dan otomatis lengkap begitu sumbernya dirapikan. */
+   Posisi kolom dibaca dari baris header (Center, Age Group, Day, Time, Slot, Cap, Used,
+   Availability, Coach, Asst. Coach, ...), jadi kolom baru di Exboard tidak merusak halaman.
+   Bila satu baris bergeser dari header, pergeseran dihitung dari posisi kolom Slot. */
 const SLOT_RE = /^(.*?)-\s*Lane\s*(\d+)\s*-\s*([A-Za-z]+)\s*-\s*(\d{1,2})[:.](\d{2})/;
+const HEAD_MATCH = {
+  age: h => /^age\s*group$/.test(h), slot: h => h==='slot', cap: h => /^cap(acity|asitas)?$/.test(h),
+  used: h => /^(used|terisi)$/.test(h), avail: h => /^availab/.test(h),
+  asst: h => /(asst|assist)/.test(h), coach: h => h==='coach',
+};
+const DEFAULT_COLS = {age:1, slot:4, cap:5, used:6, avail:7, coach:8, asst:null, end:9};
+function headerCols(r){
+  const cols = {}; let end = r.length;
+  for (let k=0; k<r.length && k<20; k++){
+    const h = cleanText(r[k]||'').toLowerCase().replace(/\./g,'');
+    if (k > 0 && h==='center'){ end = k; break; }           // tabel bantu di kanan mulai lagi dengan "Center"
+    for (const f in HEAD_MATCH) if (cols[f]==null && HEAD_MATCH[f](h)) cols[f] = k;
+    if (/^sesi$|^key/.test(h) && cols.coach!=null){ end = Math.min(end, k); }
+  }
+  if (cols.slot==null || cols.cap==null) return null;
+  return Object.assign({asst:null}, cols, {end});
+}
 function parseFeed(text){
   const rows = parseCSV(text);
   const slots = [], lost = {};   // lost[lane] = Set(field)
   let refErr = /#REF!/.test(text.slice(0, 400));
+  let cols = DEFAULT_COLS, hasAsst = false;
   for (const r of rows){
-    const center = cleanText(r[0]||'').toUpperCase();
-    if (!/^[A-Z]{2,5}$/.test(center) || center==='CENTER') continue;
+    const first = cleanText(r[0]||'');
+    if (/^center$/i.test(first)){ const hc = headerCols(r); if (hc){ cols = hc; hasAsst = hc.asst!=null; } continue; }
+    const center = first.toUpperCase();
+    if (!/^[A-Z]{2,5}$/.test(center)) continue;
     let j = -1, m = null;
-    for (let k=1; k<=9 && k<r.length; k++){ const mm = SLOT_RE.exec(cleanText(r[k]||'')); if (mm){ j = k; m = mm; break; } }
-    if (j < 4 || !m) continue;
-    const shift = j - 4;
-    const get = f => {                 // nilai kolom ke-f (urutan normal) dengan memperhitungkan pergeseran
-      const pos = 1 + shift + f;
-      if (pos <= 8) return r[pos];
-      const wrapped = pos - 10;
-      return wrapped >= 1 ? r[wrapped] : undefined;
+    for (let k=1; k<=cols.slot+6 && k<r.length; k++){ const mm = SLOT_RE.exec(cleanText(r[k]||'')); if (mm){ j = k; m = mm; break; } }
+    if (!m) continue;
+    const shift = j - cols.slot;
+    const get = f => {                 // nilai kolom f; undefined bila kolom itu tidak ada / terpotong karena pergeseran
+      if (cols[f]==null) return undefined;
+      const pos = cols[f] + shift;
+      if (pos < 1 || (shift !== 0 && pos >= cols.end)) return undefined;
+      return r[pos];
     };
     const lane = +m[2];
     const dayRaw = m[3].toLowerCase();
     const day = DAYS.find(d => d.toLowerCase() === dayRaw);
     if (!day) continue;
     const time = m[4].padStart(2,'0') + ':' + m[5];
-    const age = normAge(m[1].replace(/-\s*$/,'')) || normAge(cleanText(get(F.age)));
-    const cap = cellNum(get(F.cap));
-    const used = cellNum(get(F.used));
-    const availRaw = cleanText(get(F.avail));
+    const age = normAge(m[1].replace(/-\s*$/,'')) || normAge(cleanText(get('age')));
+    const cap = cellNum(get('cap'));
+    const used = cellNum(get('used'));
+    const availRaw = cleanText(get('avail'));
     const avail = availRaw===undefined ? undefined : /^not\s*available$/i.test(availRaw) ? 'NOT AVAILABLE' : /^available$/i.test(availRaw) ? 'AVAILABLE' : '';
-    const coach = normCoach(cleanText(get(F.coach)));
+    const coach = normCoach(cleanText(get('coach')));
+    const asst = cols.asst==null ? '' : normCoach(cleanText(get('asst')));
     const miss = [];
     if (cap===undefined) miss.push('cap');
     if (used===undefined) miss.push('used');
     if (avail===undefined) miss.push('avail');
     if (coach===undefined) miss.push('coach');
+    if (asst===undefined) miss.push('asst');
     if (miss.length){ const s = lost[lane] || (lost[lane] = new Set()); miss.forEach(x => s.add(x)); }
-    slots.push({center, lane, day, time, age, cap, used, avail, coach, miss});
+    slots.push({center, lane, day, time, age, cap, used, avail, coach, asst, miss});
   }
   if (slots.length) refErr = false;
-  return {slots, lost, refErr};
+  const lastRow = rows[rows.length-1] || [];
+  return {slots, lost, refErr, hasAsst, lastRowCut: rows.length === 2600 && /^[A-Z]{2,5}$/.test(cleanText(lastRow[0]||''))};
 }
 
 /* ================= Klasifikasi slot ================= */
 function band(s){
-  const hasClass = !!(s.age || s.coach || (s.used||0) > 0);
+  const hasClass = !!(s.age || s.coach || s.asst || (s.used||0) > 0);
   if (s.cap===0 && !(s.used>0)) return hasClass ? 'closed' : 'void';
   if (s.cap===0 && s.used>0) return 'over';
   if (s.cap==null || s.used==null) return hasClass || s.avail ? 'unknown' : 'void';
@@ -394,7 +418,7 @@ function cellHTML(s){
   const b = band(s);
   const cls = 'c b-' + b;
   const u = measurable(s) ? s.used / s.cap : null;
-  const title = `${s.day} ${s.time} · Lane ${s.lane}` + (s.age ? ` · ${s.age}` : '') + (s.coach ? ` · ${s.coach}` : '') + (u!=null ? ` · ${s.used}/${s.cap} (${pct(u)})` : '');
+  const title = `${s.day} ${s.time} · Lane ${s.lane}` + (s.age ? ` · ${s.age}` : '') + (s.coach ? ` · ${s.coach}` : '') + (s.asst ? ` · asst ${s.asst}` : '') + (u!=null ? ` · ${s.used}/${s.cap} (${pct(u)})` : '');
   const ageChip = s.age ? `<span class="age ${esc(s.age.toLowerCase())}">${esc(s.age)}</span>` : `<span class="age none">Tanpa age group</span>`;
   let right = '';
   if (b==='full') right = `<span class="tag full">Penuh</span>`;
@@ -406,7 +430,7 @@ function cellHTML(s){
   if (b==='void'){
     return `<td class="c b-void"><div class="c-empty">—</div></td>`;
   }
-  if (!s.age && !s.coach && !(s.used>0)){
+  if (!s.age && !s.coach && !s.asst && !(s.used>0)){
     const capT = s.cap==null ? '' : ` · 0/${s.cap}`;
     return `<td class="c b-void" title="${esc(title)}"><div class="c-empty">Slot kosong${capT}</div></td>`;
   }
@@ -423,6 +447,10 @@ function cellHTML(s){
   if (s.coach===undefined) coach = `<div class="c-coach na" title="Kolom coach lane ini tidak ada di sumber">coach tak tercatat</div>`;
   else if (!s.coach) coach = `<div class="c-coach na">—</div>`;
   else coach = `<div class="c-coach" title="${esc(s.coach)}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>${esc(s.coach)}</div>`;
+  if (data && data.hasAsst){
+    if (s.asst===undefined) coach += `<div class="c-coach asst na">asst tak tercatat</div>`;
+    else if (s.asst) coach += `<div class="c-coach asst" title="Assist coach: ${esc(s.asst)}"><span class="role">Asst</span>${esc(s.asst)}</div>`;
+  }
   return `<td class="${cls}" title="${esc(title)}"><div class="c-top">${ageChip}${right}</div>${fill}${coach}</td>`;
 }
 
@@ -471,22 +499,25 @@ function summaryHTML(list){
   }).join('');
   // Per coach
   const byCoach = new Map();
-  list.filter(s => s.coach).forEach(s => { const k = s.coach.toLowerCase(); if (!byCoach.has(k)) byCoach.set(k, {name:s.coach, l:[]}); byCoach.get(k).l.push(s); });
-  const coachRows = Array.from(byCoach.values()).map(c => ({...c, a: agg(c.l)}))
-    .sort((x,y) => y.l.length - x.l.length || x.name.localeCompare(y.name))
+  const entry = name => { const k = name.toLowerCase(); if (!byCoach.has(k)) byCoach.set(k, {name, l:[], a:[]}); return byCoach.get(k); };
+  list.forEach(s => { if (s.coach) entry(s.coach).l.push(s); if (s.asst) entry(s.asst).a.push(s); });
+  const coachRows = Array.from(byCoach.values()).map(c => ({...c, g: agg(c.l)}))
+    .sort((x,y) => (y.l.length + y.a.length) - (x.l.length + x.a.length) || x.name.localeCompare(y.name))
     .map(c => {
-      const days = DAYS.map((d,i) => `<i class="${c.l.some(s => s.day===d) ? 'on' : ''}" title="${d}">${DAY_ABBR[i]}</i>`).join('');
-      const ag = Array.from(new Set(c.l.map(s => s.age).filter(Boolean))).map(g => `<span class="age ${esc(g.toLowerCase())}">${esc(g)}</span>`).join(' ');
-      const lanes = Array.from(new Set(c.l.map(s => s.lane))).sort().join(', ');
-      return `<tr><td><b>${esc(c.name)}</b><div class="muted" style="font-size:12px">Lane ${lanes}</div></td><td>${ag || '<span class="muted">—</span>'}</td><td class="r">${c.l.length}</td><td><span class="days">${days}</span></td><td>${ubar(c.a.util)}</td></tr>`;
+      const all = c.l.concat(c.a);
+      const days = DAYS.map((d,i) => `<i class="${all.some(s => s.day===d) ? 'on' : ''}" title="${d}">${DAY_ABBR[i]}</i>`).join('');
+      const ag = Array.from(new Set(all.map(s => s.age).filter(Boolean))).map(g => `<span class="age ${esc(g.toLowerCase())}">${esc(g)}</span>`).join(' ');
+      const lanes = Array.from(new Set(all.map(s => s.lane))).sort((x,y)=>x-y).join(', ');
+      const sesi = `${c.l.length}${data.hasAsst ? ` <span class="muted">· ${c.a.length}</span>` : ''}`;
+      return `<tr><td><b>${esc(c.name)}</b><div class="muted" style="font-size:12px">Lane ${lanes}</div></td><td>${ag || '<span class="muted">—</span>'}</td><td class="r">${sesi}</td><td><span class="days">${days}</span></td><td>${c.l.length ? ubar(c.g.util) : '<span class="muted">hanya assist</span>'}</td></tr>`;
     }).join('');
   const coachLost = Object.keys(data.lost).filter(l => data.lost[l].has('coach')).map(Number).sort();
   return `<div class="two">
     <section class="card"><h2>Per age group</h2><p class="sub">Slot = jumlah sesi per minggu. Utilisasi = terisi ÷ kapasitas, hanya slot yang angkanya lengkap.</p>
       <div class="scroll"><table class="sum"><thead><tr><th>Age group</th><th class="r">Slot</th><th class="r">Terisi/Kap.</th><th>Utilisasi</th></tr></thead><tbody>${ageRows || '<tr><td colspan="4" class="muted">Belum ada slot dengan age group.</td></tr>'}</tbody></table></div>
     </section>
-    <section class="card"><h2>Per coach</h2><p class="sub">${coachLost.length ? `Lane ${coachLost.join(', ')} tidak punya kolom coach di sumber, jadi sesi di lane itu belum terhitung.` : 'Semua lane punya data coach.'}</p>
-      <div class="scroll"><table class="sum"><thead><tr><th>Coach</th><th>Age group</th><th class="r">Sesi</th><th>Hari</th><th>Utilisasi</th></tr></thead><tbody>${coachRows || '<tr><td colspan="5" class="muted">Belum ada coach tercatat.</td></tr>'}</tbody></table></div>
+    <section class="card"><h2>Per coach</h2><p class="sub">${coachLost.length ? `Lane ${coachLost.join(', ')} tidak punya kolom coach di sumber, jadi sesi di lane itu belum terhitung.` : (data.hasAsst ? 'Sesi dihitung terpisah sebagai coach utama dan assist coach. Utilisasi hanya dari sesi sebagai coach utama.' : 'Semua lane punya data coach.')}</p>
+      <div class="scroll"><table class="sum"><thead><tr><th>Coach</th><th>Age group</th><th class="r">${data.hasAsst ? 'Sesi coach · assist' : 'Sesi'}</th><th>Hari</th><th>Utilisasi</th></tr></thead><tbody>${coachRows || '<tr><td colspan="5" class="muted">Belum ada coach tercatat.</td></tr>'}</tbody></table></div>
     </section>
   </div>`;
 }
@@ -511,8 +542,10 @@ function render(){
     <ul>${lostLanes.map(l => `<li>Lane ${l}: ${esc(Array.from(data.lost[l]).map(x => FIELD_LABEL[x]).join(', '))}</li>`).join('')}</ul>
     <span>Slot Map di Exboard juga hanya terisi Lane 1 karena hal ini. Begitu kolomnya dirapikan di sumber, halaman ini otomatis menampilkan data lengkap.</span></div>` : '';
 
-  v.innerHTML = `${notice}
-    <div class="kpis" style="margin-top:${notice ? 18 : 0}px">
+  const cut = data.lastRowCut ? `<div class="notice err"><b>Data terpotong di baris 2.600</b>
+    <span>Sheet feed hanya mengambil sampai baris 2.600, padahal Reguler Class Availability sudah lebih panjang (ada Lane 6). Slot setelah baris itu belum tampil. Buka <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Slot Map</a>, ganti rumus A1 menjadi <code>=IMPORTRANGE("https://docs.google.com/spreadsheets/d/1CLm1NYROYjPEGisRGw-A2ZMEk7OP6d3pDJywxTBJDXA","'Reguler Class Availability'!A:L")</code>, lalu klik Tarik ulang.</span></div>` : '';
+  v.innerHTML = `${cut}${notice}
+    <div class="kpis" style="margin-top:${notice || cut ? 18 : 0}px">
       <div class="kpi main"><span class="l">Utilisasi ${esc(ui.center)}</span><span class="v">${a.util==null ? '—' : pct(a.util)}</span><span class="f">${a.used}/${a.cap} kursi · ${a.n} slot terukur</span></div>
       <div class="kpi"><span class="l">Slot berisi kelas</span><span class="v">${classes.length}<small> / ${list.length}</small></span><span class="f">per minggu, ${lanes.length} lane</span></div>
       <div class="kpi"><span class="l">Slot penuh</span><span class="v">${full}</span><span class="f">terisi ≥ kapasitas</span></div>
@@ -577,7 +610,7 @@ function applyText(text, source){
       : `<b>Tidak ada slot yang terbaca.</b> Pastikan Sheet feed berisi tab Reguler Class Availability dengan kolom Slot seperti "Baby - Lane 1 - Senin - 10:30".`);
     return false;
   }
-  data = {slots: parsed.slots, lost: parsed.lost, pulledAt: Date.now(), source};
+  data = {slots: parsed.slots, lost: parsed.lost, hasAsst: parsed.hasAsst, lastRowCut: parsed.lastRowCut, pulledAt: Date.now(), source};
   showErr('');
   lsSet(CACHE_KEY, {text, pulledAt: data.pulledAt, source});
   return true;
@@ -627,7 +660,7 @@ $('#csvFile').addEventListener('change', async e => {
 const cached = lsGet(CACHE_KEY);
 if (cached && typeof cached.text === 'string'){
   const p = parseFeed(cached.text);
-  if (p.slots.length){ data = {slots:p.slots, lost:p.lost, pulledAt:cached.pulledAt, source:cached.source}; setStatus('', 'Data tersimpan · ' + fmtTime(cached.pulledAt)); }
+  if (p.slots.length){ data = {slots:p.slots, lost:p.lost, hasAsst:p.hasAsst, lastRowCut:p.lastRowCut, pulledAt:cached.pulledAt, source:cached.source}; setStatus('', 'Data tersimpan · ' + fmtTime(cached.pulledAt)); }
 }
 render();
 pull();
