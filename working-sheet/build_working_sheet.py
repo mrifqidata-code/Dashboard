@@ -18,6 +18,15 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "exboard-slot-map"))
+from build_slot_map_tab import RCA, build_rca_copy, build_slot_map, num  # noqa: E402
+
+HELP_START = 40            # kolom rumus bantu slot map (AN ke kanan, disembunyikan)
+ST_FIRST, ST_LAST = get_column_letter(HELP_START + 8), get_column_letter(HELP_START + 14)   # kolom status
+LIST_IDX_COL = 17          # Q: nomor baris Reguler Class Availability untuk Daftar Diskusi (disembunyikan)
+
 CENTERS = ["KLM", "KWC", "PML", "TMP", "BTU", "HIB"]
 CENTER_NAME = {"KLM": "Kalimalang", "KWC": "Karawaci", "PML": "Pamulang", "TMP": "TMP", "BTU": "BTU", "HIB": "HIB"}
 DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
@@ -231,69 +240,36 @@ def ages_str(ages):
 
 
 # ---------- workbook ----------
-def build(slots, out_path, week_label, asof):
+def rng(letter):
+    return f"{RCA}!${letter}:${letter}"
+
+
+def build(feed, out_path, week_label, asof):
+    slots = parse_feed(feed)
     wb = Workbook()
     book = coach_book(slots)
     centers = [c for c in CENTERS if any(s["center"] == c for s in slots)]
+    day_idx = {d: i for i, d in enumerate(DAYS)}
 
-    # ===== Master Data =====
-    md = wb.active
-    md.title = "Master Data"
-    headers = ["Key", "Center", "Lane", "Hari", "Jam", "Age Group", "Kapasitas", "Terisi",
-               "Sisa Kursi", "Utilisasi", "Coach", "Status", "Label Slot Map", "Asst. Coach"]
-    widths = [22, 8, 6, 9, 7, 11, 10, 8, 10, 10, 14, 16, 30, 14]
-    md.append(headers)
-    for i, w in enumerate(widths, 1):
-        md.column_dimensions[get_column_letter(i)].width = w
-    for c in md[1]:
+    cp = wb.active
+    cp.title = "Cara Pakai"
+    build_guide(cp, week_label, asof)
+    rk = wb.create_sheet("Ringkasan")
+    build_summary(rk, centers, week_label, asof)
+    for c in centers:
+        ws = wb.create_sheet(c)
+        cs = sorted([s for s in slots if s["center"] == c], key=lambda s: (s["lane"], day_idx[s["day"]], s["time"]))
+        build_center(ws, c, cs, book[c], week_label, asof)
+    build_rca_copy(wb, feed)
+    rca = wb["Reguler Class Availability"]
+    rca["N1"] = ("Salinan tab Reguler Class Availability dari Exboard (kolom A:L). Minggu berikutnya: paste data terbaru "
+                 "ke A:L di tab ini, semua tab center ikut menghitung ulang.")
+    rca.freeze_panes = "A2"
+    for c in rca[1][:12]:
         c.font = font(True, 10, "FFFFFF")
         c.fill = fill(C_ACCENT)
-        c.alignment = Alignment(vertical="center", wrap_text=True)
-    day_idx = {d: i for i, d in enumerate(DAYS)}
-    slots_sorted = sorted(slots, key=lambda s: (CENTERS.index(s["center"]) if s["center"] in CENTERS else 99,
-                                                s["lane"], day_idx[s["day"]], s["time"]))
-    for i, s in enumerate(slots_sorted, start=2):
-        md.append([
-            f'=B{i}&"|"&C{i}&"|"&D{i}&"|"&E{i}', s["center"], s["lane"], s["day"], s["time"],
-            s["age"] or None, s["cap"], s["used"],
-            f'=IF(AND(ISNUMBER(G{i}),ISNUMBER(H{i})),MAX(G{i}-H{i},0),"")',
-            f'=IF(AND(ISNUMBER(G{i}),ISNUMBER(H{i})),IF(G{i}>0,H{i}/G{i},""),"")',
-            s["coach"] or None,
-            (f'=IF(OR(G{i}="",H{i}=""),"Data tidak lengkap",IF(AND(G{i}=0,H{i}=0),IF(AND(F{i}="",K{i}="",N{i}=""),"Tidak dibuka","Tutup"),'
-             f'IF(H{i}>G{i},"Lebih kapasitas",IF(H{i}=G{i},"Penuh",IF(H{i}=0,IF(F{i}="","Slot kosong","Belum terisi"),"Sebagian")))))'),
-            (f'=IF(L{i}="Tidak dibuka","–",IF(F{i}="","(tanpa age group)",F{i})&"  "&IF(H{i}="","?",H{i})&"/"&IF(G{i}="","?",G{i})'
-             f'&CHAR(10)&IF(K{i}="","coach: –","coach: "&K{i})&IF(N{i}="","",CHAR(10)&"asst: "&N{i}))'),
-            s.get("asst") or None,
-        ])
-        md.cell(i, 10).number_format = "0%"
-    last_md = len(slots_sorted) + 1
-    for row in md.iter_rows(min_row=2, max_row=last_md):
-        for c in row:
-            c.font = font(size=9)
-    for col in (6, 7, 8, 11, 14):   # kolom input dari sumber
-        for r in range(2, last_md + 1):
-            md.cell(r, col).font = font(size=9, color="0000FF")
-    md.freeze_panes = "B2"
-    md.auto_filter.ref = f"A1:N{last_md}"
-    md.cell(1, 7).comment = Comment("Kapasitas, Terisi, Age Group, Coach dan Asst. Coach disalin dari Exboard › Reguler Class Availability. "
-                                    "Kolom lain dihitung dengan rumus.", "Working sheet")
-    M = "'Master Data'"
-    rng = lambda col: f"{M}!${col}$2:${col}${last_md}"
-
-    # ===== Ringkasan =====
-    rk = wb.create_sheet("Ringkasan", 0)
-
-    # ===== Cara Pakai =====
-    cp = wb.create_sheet("Cara Pakai", 0)
-    build_guide(cp, week_label, asof)
-
-    build_summary(rk, centers, rng, week_label, asof)
-
-    # ===== Per center =====
-    for c in centers:
-        ws = wb.create_sheet(c, wb.sheetnames.index("Master Data"))
-        build_center(ws, c, [s for s in slots_sorted if s["center"] == c], book[c], rng, week_label, asof)
-
+    for letter, w in zip("ABCDEFGHIJKL", [8, 10, 18, 7, 30, 6, 6, 14, 14, 14, 8, 30]):
+        rca.column_dimensions[letter].width = w
     wb.active = wb.sheetnames.index("Ringkasan")
     wb.save(out_path)
 
@@ -312,7 +288,7 @@ def build_guide(ws, week_label, asof):
     r += 1
     steps = [
         ("1. Buka tab center", "Satu tab per center (KLM, KWC, PML, TMP, BTU, HIB). Mulai dari ringkasan di atas: utilisasi, jumlah kelas belum terisi, slot kosong."),
-        ("2. Lihat Slot Map", "Grid per lane: baris = jam, kolom = hari. Tiap sel berisi age group, terisi/kapasitas, dan coach. Merah = kelas sudah ada tapi 0 murid. Oranye = kapasitas ada tapi belum ada kelas."),
+        ("2. Lihat Slot Map", "Tampilan sama dengan tab Slot Map di Exboard, tanpa pilihan center. Grid per lane: baris = jam, kolom = hari. Tiap sel berisi age group, terisi/kapasitas (%), coach, dan assist coach. Merah = kelas sudah ada tapi 0 murid. Oranye = kapasitas ada tapi belum ada kelas."),
         ("3. Putuskan di Daftar Diskusi", "Di bawah slot map ada daftar semua slot merah & oranye. Isi kolom kuning: keputusan, age group yang dijual, coach PIC, target murid, catatan."),
         ("4. Cek coach", "Kolom 'Coach available' menyarankan coach yang bertugas hari itu dan tidak sedang mengajar di jam tersebut, beserta age group yang biasa mereka ajar. Tabel Coach di bagian bawah tab menunjukkan beban tiap coach per hari."),
         ("5. Kirim ke Student Advisor", "Filter kolom Keputusan = 'Jual minggu ini' atau 'Buka kelas baru'. Itulah daftar kelas yang dijual SA minggu itu."),
@@ -350,8 +326,8 @@ def build_guide(ws, week_label, asof):
     ws.cell(r, 2).border = BORDER
     ws.cell(r, 3, "Hanya sel kuning yang diisi saat meeting (minggu, peserta, keputusan, age group dijual, coach PIC, target, catatan). Sel lain berisi rumus.").font = font()
     r += 1
-    ws.cell(r, 2, "Teks biru").font = font(True, color="0000FF")
-    ws.cell(r, 3, "Di tab Master Data: angka yang disalin dari Exboard (age group, kapasitas, terisi, coach).").font = font()
+    ws.cell(r, 2, "Data sumber").font = font(True, color=C_ACCENT)
+    ws.cell(r, 3, "Tab Reguler Class Availability = salinan tab yang sama di Exboard (kolom A:L). Semua rumus membaca tab ini.").font = font()
     r += 2
     ws.cell(r, 2, "Contoh pengisian").font = font(True, 12)
     r += 1
@@ -368,8 +344,9 @@ def build_guide(ws, week_label, asof):
         "Coach available = coach yang punya jadwal di center itu pada hari yang sama dan tidak mengajar dalam rentang ±45 menit dari slot tersebut. "
         "Age group di dalam kurung = age group yang dia ajar minggu ini di center itu. Ini saran; cek ulang ke senior coach.",
         "Coach yang tidak punya jadwal sama sekali di hari itu tidak muncul sebagai available (bisa saja libur).",
-        "Untuk memperbarui data minggu berikutnya: ganti isi tab Master Data (kolom biru) dengan data terbaru. Slot map, ringkasan dan status ikut menghitung ulang. "
-        "Daftar Diskusi dan saran coach dibuat saat file digenerate, jadi generate ulang file-nya tiap minggu.",
+        "Minggu berikutnya: copy kolom A:L dari tab Reguler Class Availability di Exboard, paste ke tab dengan nama sama di file ini. "
+        "Slot map, ringkasan, status di Daftar Diskusi dan tabel Coach ikut menghitung ulang. Baris di Daftar Diskusi dan saran coach "
+        "available dibuat saat file digenerate, jadi untuk daftar yang benar-benar baru, generate ulang file-nya.",
     ]
     for n in notes:
         ws.cell(r, 3, n).font = font()
@@ -379,7 +356,7 @@ def build_guide(ws, week_label, asof):
         r += 1
 
 
-def build_summary(ws, centers, rng, week_label, asof):
+def build_summary(ws, centers, week_label, asof):
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 3
     ws.cell(2, 2, "Ringkasan Utilisasi per Center").font = font(True, 16, C_ACCENT)
@@ -398,10 +375,12 @@ def build_summary(ws, centers, rng, week_label, asof):
         r = 6 + k
         ws.cell(r, 2, cen).font = font(True)
         ws.cell(r, 3, f'=IFERROR(D{r}/E{r},"")').number_format = "0%"
-        ws.cell(r, 4, f'=SUMIFS({rng("H")},{rng("B")},B{r},{rng("G")},">0")')
-        ws.cell(r, 5, f'=SUMIFS({rng("G")},{rng("B")},B{r},{rng("G")},">0")')
-        for j, st in enumerate(["Belum terisi", "Slot kosong", "Sebagian", "Penuh", "Lebih kapasitas"]):
-            cell = ws.cell(r, 6 + j, f'=COUNTIFS({rng("B")},$B{r},{rng("L")},"{st}")')
+        ws.cell(r, 4, f'=SUMIFS({rng("G")},{rng("A")},B{r},{rng("F")},">0")')
+        ws.cell(r, 5, f'=SUMIFS({rng("F")},{rng("A")},B{r},{rng("F")},">0")')
+        st_rng = f"'{cen}'!${ST_FIRST}$1:${ST_LAST}$1000"
+        for j, (st, keys) in enumerate([("Belum terisi", ["Belum terisi"]), ("Slot kosong", ["Kosong"]),
+                                        ("Sebagian", ["Sebagian", "Tinggi"]), ("Penuh", ["Penuh"]), ("Lebih kapasitas", ["Lebih"])]):
+            cell = ws.cell(r, 6 + j, "=" + "+".join(f'COUNTIF({st_rng},"{k}")' for k in keys))
             cell.fill = fill(STATUS_FILL[st]) if st in ("Belum terisi", "Slot kosong") else PatternFill()
         link = ws.cell(r, 11, f"→ {cen}")
         link.hyperlink = f"#'{cen}'!A1"
@@ -428,131 +407,28 @@ def build_summary(ws, centers, rng, week_label, asof):
                                                                  end_type="num", end_value=1, end_color="BFE3C8"))
 
 
-def build_center(ws, center, slots, book_c, rng, week_label, asof):
-    ws.sheet_view.showGridLines = False
+def build_center(ws, center, slots, book_c, week_label, asof):
+    # Blok Slot Map: sama dengan tab Slot Map Exboard, center tetap (tanpa dropdown)
+    r = build_slot_map(ws, center=center, helper_start=HELP_START)
     ws.sheet_view.zoomScale = 90
-    widths = {"A": 8, "B": 19, "C": 19, "D": 19, "E": 19, "F": 19, "G": 19, "H": 19,
-              "I": 40, "J": 18, "K": 16, "L": 14, "M": 11, "N": 34}
-    for k, v in widths.items():
+    ws.column_dimensions[get_column_letter(LIST_IDX_COL)].hidden = True
+    for k, v in {"I": 40, "J": 18, "K": 16, "L": 14, "M": 14, "N": 11, "O": 34}.items():
         ws.column_dimensions[k].width = v
-    HELP0 = 20  # kolom bantu (status) mulai kolom T, disembunyikan
-    for i in range(HELP0, HELP0 + 7):
-        ws.column_dimensions[get_column_letter(i)].hidden = True
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
-
-    # ----- Header -----
-    name = CENTER_NAME.get(center, center)
-    ws.cell(1, 1, f"SLOT MAP · {center}" + (f" · {name}" if name != center else "")).font = font(True, 16, C_ACCENT)
-    ws.merge_cells("A1:F1")
-    ws.cell(2, 1, f"Data per {asof} · sumber: Exboard › Reguler Class Availability").font = font(size=9, color=C_MUTED)
-    ws.merge_cells("A2:F2")
-    ws["A3"] = "Center"
-    ws["B3"] = center
-    ws["A4"] = "Minggu"
-    ws["B4"] = week_label
-    ws["C3"] = "Center Manager"
-    ws["C4"] = "Senior Coach"
-    for a in ("A3", "A4", "C3", "C4"):
-        ws[a].font = font(True, color=C_MUTED)
-    ws["B3"].font = font(True, 12)
-    for a in ("B4", "D3", "D4"):
-        ws[a].fill = fill(C_INPUT)
-        ws[a].border = BORDER
-        ws[a].font = font()
-    ws.merge_cells("D3:E3")
-    ws.merge_cells("D4:E4")
-
-    # KPI row
-    kpis = [
-        ("Utilisasi", f'=IFERROR(SUMIFS({rng("H")},{rng("B")},$B$3,{rng("G")},">0")/SUMIFS({rng("G")},{rng("B")},$B$3,{rng("G")},">0"),"")', "0%", C_ACCENT_SOFT),
-        ("Kursi terisi", f'=SUMIFS({rng("H")},{rng("B")},$B$3,{rng("G")},">0")&" / "&SUMIFS({rng("G")},{rng("B")},$B$3,{rng("G")},">0")', "@", C_ACCENT_SOFT),
-        ("Belum terisi", f'=COUNTIFS({rng("B")},$B$3,{rng("L")},"Belum terisi")', "0", STATUS_FILL["Belum terisi"]),
-        ("Slot kosong", f'=COUNTIFS({rng("B")},$B$3,{rng("L")},"Slot kosong")', "0", STATUS_FILL["Slot kosong"]),
-        ("Sebagian", f'=COUNTIFS({rng("B")},$B$3,{rng("L")},"Sebagian")', "0", STATUS_FILL["Sebagian"]),
-        ("Penuh", f'=COUNTIFS({rng("B")},$B$3,{rng("L")},"Penuh")', "0", STATUS_FILL["Penuh"]),
-        ("Lebih kapasitas", f'=COUNTIFS({rng("B")},$B$3,{rng("L")},"Lebih kapasitas")', "0", STATUS_FILL["Lebih kapasitas"]),
-    ]
-    for i, (lab, f_, nf, col) in enumerate(kpis):
-        c = 2 + i
-        ws.cell(6, c, lab).font = font(True, 9, C_INK)
-        ws.cell(6, c).fill = fill(col)
-        v = ws.cell(7, c, f_)
-        v.font = font(True, 16)
-        v.number_format = nf
-        v.fill = fill(col)
-        v.alignment = Alignment(horizontal="left")
-        for rr in (6, 7):
-            ws.cell(rr, c).border = BORDER
-    ws.cell(6, 1, "Ringkasan").font = font(True, 9, C_MUTED)
-
-    # Legend
-    ws.cell(9, 1, "Warna").font = font(True, 9, C_MUTED)
-    for i, st in enumerate(["Belum terisi", "Slot kosong", "Sebagian", "Penuh", "Lebih kapasitas", "Tutup"]):
-        c = ws.cell(9, 2 + i, st)
-        c.fill = fill(STATUS_FILL[st])
-        c.font = font(True, 9)
-        c.border = BORDER
-        c.alignment = Alignment(horizontal="center")
-    ws.cell(10, 2, "Isi sel: age group  terisi/kapasitas, lalu coach. Merah & oranye = bahan diskusi (lihat Daftar Diskusi di bawah).").font = font(size=9, color=C_MUTED, italic=True)
-
-    # Navigation placeholders (filled after we know row numbers)
-    nav_row = 11
-
-    # ----- Slot map per lane -----
-    r = 13
-    slotmap_row = r
-    lanes = sorted({s["lane"] for s in slots})
-    grid_ranges = []
-    for lane in lanes:
-        ls = [s for s in slots if s["lane"] == lane]
-        times = sorted({s["time"] for s in ls})
-        ws.cell(r, 1, f"LANE {lane}").font = font(True, 13, "FFFFFF")
-        for c in range(1, 9):
-            ws.cell(r, c).fill = fill(C_ACCENT)
-        ws.cell(r, 3, f'="Utilisasi lane: "&IFERROR(TEXT(SUMIFS({rng("H")},{rng("B")},$B$3,{rng("C")},{lane},{rng("G")},">0")/SUMIFS({rng("G")},{rng("B")},$B$3,{rng("C")},{lane},{rng("G")},">0"),"0%"),"–")'
-                         f'&"   ·   Belum terisi: "&COUNTIFS({rng("B")},$B$3,{rng("C")},{lane},{rng("L")},"Belum terisi")'
-                         f'&"   ·   Slot kosong: "&COUNTIFS({rng("B")},$B$3,{rng("C")},{lane},{rng("L")},"Slot kosong")').font = font(True, 10, "FFFFFF")
-        r += 1
-        ws.cell(r, 1, "Jam").font = font(True, 9, C_MUTED)
-        for i, d in enumerate(DAYS):
-            h = ws.cell(r, 2 + i, d)
-            h.font = font(True, 10)
-            h.fill = fill("F0F4F5")
-            h.alignment = Alignment(horizontal="center")
-            h.border = BORDER
-        ws.cell(r, 1).border = BORDER
-        head_row = r
-        r += 1
-        top = r
-        for t in times:
-            tc = ws.cell(r, 1, t)
-            tc.font = font(True, 10)
-            tc.alignment = Alignment(vertical="top", horizontal="center")
-            tc.border = BORDER
-            for i in range(7):
-                col = 2 + i
-                key = f'$B$3&"|{lane}|"&{get_column_letter(col)}${head_row}&"|"&$A{r}'
-                c = ws.cell(r, col, f'=IFERROR(INDEX({rng("M")},MATCH({key},{rng("A")},0)),"")')
-                c.font = font(size=9)
-                c.alignment = Alignment(wrap_text=True, vertical="top")
-                c.border = BORDER
-                hc = ws.cell(r, HELP0 + i, f'=IFERROR(INDEX({rng("L")},MATCH({key},{rng("A")},0)),"")')
-                hc.font = font(size=8, color=C_MUTED)
-            ws.row_dimensions[r].height = 40
-            r += 1
-        grid_ranges.append((top, r - 1))
-        r += 1
-
-    # Conditional formatting on grids via hidden helper status columns
-    helper_first = get_column_letter(HELP0)
-    for top, bot in grid_ranges:
-        area = f"B{top}:H{bot}"
-        for st, col in STATUS_FILL.items():
-            ws.conditional_formatting.add(area, FormulaRule(formula=[f'{helper_first}{top}="{st}"'], fill=fill(col), stopIfTrue=True))
-        ws.conditional_formatting.add(area, FormulaRule(formula=[f'{helper_first}{top}="Tidak dibuka"'], font=Font(name=FONT, color="B0B8BA"), stopIfTrue=True))
+    ws["A2"].value = ws["A2"].value + f"  ·  Data per {asof}"
+    # Info meeting (kuning = diisi)
+    for c_lab, c_val, lab, val in (("C", "D", "Minggu", week_label), ("E", "F", "Center Manager", None), ("G", "H", "Senior Coach", None)):
+        ws[f"{c_lab}4"] = lab
+        ws[f"{c_lab}4"].font = font(True, 9, C_MUTED)
+        ws[f"{c_lab}4"].alignment = Alignment(horizontal="right")
+        ws[f"{c_val}4"] = val
+        ws[f"{c_val}4"].fill = fill(C_INPUT)
+        ws[f"{c_val}4"].border = BORDER
+        ws[f"{c_val}4"].font = font()
+    nav_row, slotmap_row = 11, 12
 
     # ----- Daftar Diskusi -----
     r += 1
@@ -584,7 +460,13 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
     coach_names = sorted({c["name"] for c in book_c.values()})
     first_item = r
     for n, s in enumerate(todo, 1):
-        key = f'$B$3&"|"&D{r}&"|"&B{r}&"|"&C{r}'
+        n_ref = f"$Q{r}"
+        ws.cell(r, LIST_IDX_COL, f'=IFERROR(MATCH($B$4&"|- Lane "&D{r}&" - "&B{r}&"|"&C{r},{rng("L")},0),"")')
+        age = f'INDEX({rng("B")},{n_ref})&""'
+        cap = num(f'INDEX({rng("F")},{n_ref})')
+        used = num(f'INDEX({rng("G")},{n_ref})')
+        coach = f'INDEX({rng("I")},{n_ref})&""'
+        asst = f'INDEX({rng("J")},{n_ref})&""'
         avail, _ = available_coaches(book_c, s["day"], s["time"], exclude=s["coach"])
         avail = [c for c in avail if c["name"].lower() != (s.get("asst") or "").lower()]
         avail_txt = "; ".join(f'{c["name"]} ({ages_str(c["ages"]) or "–"})' for c in avail[:6])
@@ -598,10 +480,11 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
         for c in avail:
             pool |= c["ages"]
         row = [n, s["day"], s["time"], s["lane"],
-               f'=IFERROR(INDEX({rng("L")},MATCH({key},{rng("A")},0)),"")',
-               f'=IFERROR(INDEX({rng("F")},MATCH({key},{rng("A")},0))&"","")',
-               f'=IFERROR(INDEX({rng("G")},MATCH({key},{rng("A")},0)),"")',
-               f'=IFERROR(INDEX({rng("K")},MATCH({key},{rng("A")},0))&IF(INDEX({rng("N")},MATCH({key},{rng("A")},0))="",""," + asst "&INDEX({rng("N")},MATCH({key},{rng("A")},0))),"")',
+               (f'=IF({n_ref}="","Tidak ada di data",IF(AND({cap}=0,{used}=0),"Tutup",IF({used}>{cap},"Lebih",IF({used}={cap},"Penuh",'
+                f'IF({used}=0,IF({age}="","Kosong","Belum terisi"),IF({used}/{cap}>=0.6,"Tinggi","Sebagian"))))))'),
+               f'=IF({n_ref}="","",PROPER({age}))',
+               f'=IF({n_ref}="","",{cap})',
+               f'=IF({n_ref}="","",PROPER({coach})&IF({asst}="",""," + asst "&PROPER({asst})))',
                avail_txt or "Tidak ada coach lain yang bertugas & kosong",
                ages_str(pool) or "–",
                None, None, None, None, None]
@@ -619,7 +502,7 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
     if todo:
         st_col = f"E{first_item}:E{last_item}"
         ws.conditional_formatting.add(st_col, FormulaRule(formula=[f'E{first_item}="Belum terisi"'], fill=fill(STATUS_FILL["Belum terisi"])))
-        ws.conditional_formatting.add(st_col, FormulaRule(formula=[f'E{first_item}="Slot kosong"'], fill=fill(STATUS_FILL["Slot kosong"])))
+        ws.conditional_formatting.add(st_col, FormulaRule(formula=[f'E{first_item}="Kosong"'], fill=fill(STATUS_FILL["Slot kosong"])))
         ws.conditional_formatting.add(f"A{first_item}:O{last_item}", FormulaRule(formula=[f'$K{first_item}="Jual minggu ini"'], font=Font(name=FONT, bold=True, color="0D6B3A")))
         ws.auto_filter.ref = f"A{list_head}:O{last_item}"
         dv1 = DataValidation(type="list", formula1='"' + ",".join(DECISIONS) + '"', allow_blank=True)
@@ -661,10 +544,11 @@ def build_center(ws, center, slots, book_c, rng, week_label, asof):
         ws.cell(r, 2, cinfo["name"])
         ws.cell(r, 3, ages_str(cinfo["ages"]) or "–")
         for i, d in enumerate(DAYS):
-            ws.cell(r, 4 + i, f'=COUNTIFS({rng("B")},$B$3,{rng("K")},$B{r},{rng("D")},{get_column_letter(4+i)}${c_first-1})'
-                                 f'+COUNTIFS({rng("B")},$B$3,{rng("N")},$B{r},{rng("D")},{get_column_letter(4+i)}${c_first-1})')
-        ws.cell(r, 11, f'=COUNTIFS({rng("B")},$B$3,{rng("K")},$B{r})')
-        ws.cell(r, 12, f'=COUNTIFS({rng("B")},$B$3,{rng("N")},$B{r})')
+            day = f'"* - "&{get_column_letter(4+i)}${c_first-1}'
+            ws.cell(r, 4 + i, f'=COUNTIFS({rng("A")},$B$4,{rng("I")},$B{r},{rng("C")},{day})'
+                                 f'+COUNTIFS({rng("A")},$B$4,{rng("J")},$B{r},{rng("C")},{day})')
+        ws.cell(r, 11, f'=COUNTIFS({rng("A")},$B$4,{rng("I")},$B{r})')
+        ws.cell(r, 12, f'=COUNTIFS({rng("A")},$B$4,{rng("J")},$B{r})')
         ws.cell(r, 13, span)
         for col in range(1, 14):
             cell = ws.cell(r, col)
@@ -699,4 +583,4 @@ if __name__ == "__main__":
     ap.add_argument("--week", default="")
     ap.add_argument("--asof", default=date.today().isoformat())
     a = ap.parse_args()
-    build(parse_feed(a.feed), a.out, a.week, a.asof)
+    build(a.feed, a.out, a.week, a.asof)

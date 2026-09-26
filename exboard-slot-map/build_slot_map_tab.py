@@ -88,32 +88,40 @@ def build_rca_copy(wb, feed):
     ws["N1"].font = font(True, 10, "B03A2E")
 
 
-def build_slot_map(ws):
+def build_slot_map(ws, center=None, helper_start=IDX0):
+    """Tulis blok Slot Map ke `ws`. center=None: pilih center lewat dropdown B4 (tab Exboard).
+    center="KLM": center tetap, tanpa dropdown (tab per center di working sheet mingguan).
+    helper_start: kolom pertama area rumus bantu (disembunyikan). Mengembalikan baris kosong berikutnya."""
+    IDX0 = helper_start
+    ST0 = IDX0 + 8
+    TZ, TF, TC = ST0 + 8, ST0 + 9, ST0 + 10
     ws.sheet_view.showGridLines = False
     ws.column_dimensions["A"].width = 8
     for i in range(7):
         ws.column_dimensions[col(DISP0 + i)].width = 21
-    ws.column_dimensions["I"].width = 2
-    for c in list(range(IDX0, IDX0 + 7)) + [17] + list(range(ST0, ST0 + 7)) + [25, TZ, TF, TC]:
+    if helper_start == 10:
+        ws.column_dimensions["I"].width = 2
+    for c in list(range(IDX0, IDX0 + 7)) + [IDX0 + 7] + list(range(ST0, ST0 + 7)) + [ST0 + 7, TZ, TF, TC]:
         ws.column_dimensions[col(c)].hidden = True
 
     # ---------- header ----------
-    ws["A1"] = "SLOT MAP — JADWAL KELAS PER LANE"
+    ws["A1"] = "SLOT MAP — JADWAL KELAS PER LANE" if center is None else f"SLOT MAP — {center}"
     ws["A1"].font = font(True, 16, ACCENT)
     ws["A2"] = ("Baris = jam, kolom = hari. Tiap sel: age group · terisi/kapasitas (%) · coach · assist coach. "
-                "Warna = status keterisian. Ganti center di B4.")
+                "Warna = status keterisian." + (" Ganti center di B4." if center is None else ""))
     ws["A2"].font = font(size=9, color=MUTED)
     ws["A4"] = "Center"
     ws["A4"].font = font(True, color=MUTED)
-    ws["B4"] = "KLM"
+    ws["B4"] = center or "KLM"
     ws["B4"].font = font(True, 12)
-    ws["B4"].fill = fill("FFF4B8")
     ws["B4"].border = BORDER
-    ws["C4"] = "← pilih center"
-    ws["C4"].font = font(size=9, color=MUTED, italic=True)
-    dv = DataValidation(type="list", formula1='"' + ",".join(CENTERS) + '"', allow_blank=False)
-    ws.add_data_validation(dv)
-    dv.add("B4")
+    if center is None:
+        ws["B4"].fill = fill("FFF4B8")
+        ws["C4"] = "← pilih center"
+        ws["C4"].font = font(size=9, color=MUTED, italic=True)
+        dv = DataValidation(type="list", formula1='"' + ",".join(CENTERS) + '"', allow_blank=False)
+        ws.add_data_validation(dv)
+        dv.add("B4")
 
     # KPI (baris 6-7): kolom B..H
     st_all = f"${col(ST0)}$1:${col(ST0 + 6)}$1000"
@@ -253,8 +261,9 @@ def build_slot_map(ws):
         ws.conditional_formatting.add(area, FormulaRule(formula=[f'{col(ST0)}{first}="Tidak dibuka"'], font=Font(name=FONT, color="B0B8BA"), stopIfTrue=True))
 
     ws.cell(r, 1, ("Catatan: sel kosong = jam itu tidak ada di jadwal lane tersebut. '–' = slot tidak dibuka (kapasitas 0, tanpa kelas). "
-                   "Kolom J:AB tersembunyi berisi rumus bantu; jangan dihapus.")).font = font(size=8, color=MUTED, italic=True)
+                   f"Kolom {col(IDX0)}:{col(TC)} tersembunyi berisi rumus bantu; jangan dihapus.")).font = font(size=8, color=MUTED, italic=True)
     ws.freeze_panes = "B1"
+    return r + 1
 
 
 def main(feed, out):
