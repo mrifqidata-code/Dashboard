@@ -22,7 +22,7 @@ CENTERS = ["KLM", "KWC", "PML", "TMP", "BTU", "HIB"]
 CENTER_NAME = {"KLM": "Kalimalang", "KWC": "Karawaci", "PML": "Pamulang", "TMP": "TMP", "BTU": "BTU", "HIB": "HIB"}
 DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 AGES = ["Baby", "Tiny", "Little", "Kids", "Star"]
-AGE_RANGE = {"Baby": "6–17 bulan", "Tiny": "18–36 bulan", "Little": "3–5 tahun", "Kids": "5–8+ tahun", "Star": ""}
+AGE_RANGE = {"Baby": "6–17 bulan", "Tiny": "18–36 bulan", "Little": "3–5 tahun", "Kids": "5–8+ tahun", "Star": "9–12 tahun"}
 SESSION_GAP_MIN = 45  # dua sesi dianggap bentrok bila jaraknya < 45 menit
 DECISIONS = ["Jual minggu ini", "Buka kelas baru", "Ganti age group", "Tahan", "Tutup slot"]
 
