@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Rekap Mingguan Area</title>
-<meta name="description" content="Rekap mingguan acquisition, revenue, CVR dan DP → FP per center.">
+<title>Rekap Area</title>
+<meta name="description" content="Rekap harian, mingguan dan bulanan: acquisition, revenue, CVR dan DP → FP per center.">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
@@ -103,9 +103,18 @@ select:focus,.btn:focus-visible,.appnav a:focus-visible,.trend th button:focus-v
 
 /* Week bar */
 .weekbar{position:sticky;top:0;z-index:20;background:var(--page);border-bottom:1px solid var(--border)}
-.wb{display:flex;align-items:center;gap:8px;padding-top:10px;padding-bottom:10px}
-.wb select{flex:1 1 auto}
-.wb-nav{display:flex;align-items:center;gap:8px;flex:1 1 auto;max-width:460px;min-width:0}
+.wb{display:flex;align-items:center;gap:8px;padding-top:10px;padding-bottom:10px;flex-wrap:wrap}
+.wb select,.wb input[type=date]{flex:1 1 auto}
+.wb-nav{display:flex;align-items:center;gap:8px;flex:1 1 260px;max-width:460px;min-width:0}
+input[type=date]{min-height:40px;border:1px solid var(--border-2);border-radius:10px;background:var(--surface);padding:6px 10px;font-size:16px;width:100%;min-width:0;color:inherit;font-family:inherit}
+input[type=date]:focus{outline:2px solid var(--accent);outline-offset:1px}
+input[type=date][hidden],select[hidden]{display:none}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13.5px;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:600px){ .seg{flex:1 1 100%} .seg button{flex:1} }
+.notice.info{background:var(--accent-soft);color:var(--ink)}
 
 main{padding-top:16px}
 .notice{border-radius:12px;padding:12px 14px;font-size:13.5px;background:var(--warn-bg);color:var(--warn-ink);margin-bottom:14px}
@@ -193,7 +202,7 @@ table.trend{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5p
   <div class="wrap top-inner">
     <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 16c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 20c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><circle cx="15" cy="6" r="2"/><path d="M5 12l4-4 3 2 4-1"/></svg></div>
     <div class="brand">
-      <h1>Rekap Mingguan Area</h1>
+      <h1>Rekap Area</h1>
       <p>KLM · KWC · PML · BTU · TMP · HIB</p>
     </div>
     <div class="right">
@@ -210,10 +219,16 @@ table.trend{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5p
 
 <div class="weekbar">
   <div class="wrap wb">
+    <div class="seg" id="modeSeg" role="group" aria-label="Jenis periode">
+      <button type="button" data-mode="day" aria-pressed="false">Harian</button>
+      <button type="button" data-mode="week" aria-pressed="true">Mingguan</button>
+      <button type="button" data-mode="month" aria-pressed="false">Bulanan</button>
+    </div>
     <div class="wb-nav">
-      <button class="btn icon" id="wPrev" type="button" aria-label="Minggu sebelumnya">‹</button>
-      <select id="wSel" aria-label="Pilih minggu"></select>
-      <button class="btn icon" id="wNext" type="button" aria-label="Minggu berikutnya">›</button>
+      <button class="btn icon" id="wPrev" type="button" aria-label="Periode sebelumnya">‹</button>
+      <select id="wSel" aria-label="Pilih periode"></select>
+      <input type="date" id="dSel" aria-label="Pilih tanggal" hidden>
+      <button class="btn icon" id="wNext" type="button" aria-label="Periode berikutnya">›</button>
     </div>
     <button class="btn sm" id="wLatest" type="button">Terbaru</button>
   </div>
@@ -231,20 +246,28 @@ table.trend{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5p
 'use strict';
 
 /* ================= Konfigurasi ================= */
-// Sheet "Feed Rekap Mingguan Area (dari Exboard)": satu baris per center per minggu.
-// Agar bisa dibaca dari luar claude.ai, Sheet ini harus dibagikan "Siapa saja yang memiliki link" (Viewer).
-const FEED_ID = '122A4RyzPQQzyLU8Q8dpv8KYn7D6SBLJtn4BMlwnkQtc';
-const FEED_URL = `https://docs.google.com/spreadsheets/d/${FEED_ID}/edit`;
+// Tiga Sheet feed dari Exboard. Agar bisa dibaca dari luar claude.ai, tiap Sheet harus dibagikan
+// "Siapa saja yang memiliki link" (Viewer).
+const SRC = {
+  // Satu baris per center per minggu (Acquisition = Paid DP + Paid Full). Dipakai selama tabel harian belum ada.
+  week:  {id:'122A4RyzPQQzyLU8Q8dpv8KYn7D6SBLJtn4BMlwnkQtc', name:'Feed Rekap Mingguan Area', cache:'rekapLite.cache.v1'},
+  // IMPORTRANGE tab "02 Acquisition": bulan berjalan per center (Acquisition & Revenue versi Exboard).
+  month: {id:'1AENDIBlBmmf6K9axK06RdvDCDgUHw_6kqDeAjcT7ww4', name:'Feed Rekap Bulanan', cache:'rekapLite.month.v1'},
+  // IMPORTRANGE tab "Feed Harian": satu baris per tanggal per center. Isi ID-nya setelah tab itu dibuat di Exboard.
+  day:   {id:'', name:'Feed Rekap Harian', cache:'rekapLite.day.v1'}
+};
 const CENTERS = ['KLM','KWC','PML','BTU','TMP','HIB'];
 const CCOLOR = {KLM:'var(--s1)',KWC:'var(--s2)',PML:'var(--s3)',BTU:'var(--s4)',TMP:'var(--s5)',HIB:'var(--s6)'};
 // Threshold sama dengan bawaan dashboard Rekap Mingguan Area di claude.ai
 const TH = { acq:{green:100, red:90}, rev:{green:100, red:90}, cvr:{green:45, red:35}, dp:{green:80, red:70} };
 const ST = { g:{label:'Hijau', icon:'✓', rank:0, emoji:'🟢'}, y:{label:'Kuning', icon:'!', rank:1, emoji:'🟡'}, r:{label:'Merah', icon:'✕', rank:2, emoji:'🔴'} };
-const CACHE_KEY = 'rekapLite.cache.v1';
+const UI_KEY = 'rekapLite.ui.v1';
 const LAST_KEY = 'dashboardApp.last';
 const STALE_MS = 5 * 60 * 1000;      // tarik ulang otomatis saat app dibuka lagi setelah 5 menit
 const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-const TREND_N = 8;
+const BULAN_PJG = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const HARI = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+const HARI_PJG = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 
 /* ================= Util ================= */
 const $ = s => document.querySelector(s);
@@ -253,6 +276,7 @@ const fmt = (v, d=1) => (v==null || isNaN(v)) ? '—' : Number(v).toLocaleString
 const fmtPct = (v, d=1) => (v==null || isNaN(v)) ? '—' : fmt(v,d) + '%';
 const round1 = v => Math.round(v*10)/10;
 const has = v => v!=null && v!=='' && isFinite(v);
+const norm = s => String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 function fmtRpS(v){
   if (v==null || isNaN(v)) return '—';
   const a = Math.abs(v);
@@ -270,6 +294,16 @@ function lsGet(k){ try { return JSON.parse(localStorage.getItem(k) || 'null'); }
 function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
 let toastT;
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ================= Tanggal ================= */
+const pad2 = n => String(n).padStart(2,'0');
+const isoOf = d => d.getUTCFullYear() + '-' + pad2(d.getUTCMonth()+1) + '-' + pad2(d.getUTCDate());
+const dateOf = s => { const [y,m,d] = s.split('-').map(Number); return new Date(Date.UTC(y, m-1, d)); };
+const addDays = (s, n) => { const d = dateOf(s); d.setUTCDate(d.getUTCDate() + n); return isoOf(d); };
+const TODAY = (() => { const n = new Date(); return n.getFullYear() + '-' + pad2(n.getMonth()+1) + '-' + pad2(n.getDate()); })();
+const CUR_MONTH = TODAY.slice(0,7);
+const daysInMonth = m => { const [y,mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo, 0)).getUTCDate(); };
+function shiftMonth(m, n){ let [y, mo] = m.split('-').map(Number); mo += n; y += Math.floor((mo-1)/12); mo = ((mo-1)%12+12)%12+1; return y + '-' + pad2(mo); }
 
 /* ISO week (Senin–Minggu) */
 function isoWeekUTC(t){
@@ -292,8 +326,36 @@ function weekRange(key){
   if (m1!==m2) return `${d1} ${BULAN[m1]} – ${d2} ${BULAN[m2]} ${y2}`;
   return `${d1}–${d2} ${BULAN[m2]} ${y2}`;
 }
-const CUR_WEEK = (() => { const n = new Date(); return isoWeekUTC(new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()))); })();
-const weekLabel = key => `${weekNo(key)} · ${weekRange(key)}${key===CUR_WEEK ? ' (berjalan)' : ''}`;
+const CUR_WEEK = isoWeekUTC(dateOf(TODAY));
+const dayText = k => { const d = dateOf(k); return `${HARI_PJG[d.getUTCDay()]}, ${d.getUTCDate()} ${BULAN[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+const monthText = k => `${BULAN_PJG[+k.slice(5)-1]} ${k.slice(0,4)}`;
+const upToToday = () => `s.d. ${Number(TODAY.slice(8))} ${BULAN[+TODAY.slice(5,7)-1]}`;
+
+// Aturan tiap jenis periode: kunci, pembanding, dan label
+const P = {
+  day: {
+    cur: TODAY, prev: k => addDays(k, -7),
+    label: k => dayText(k) + (k===TODAY ? ' (hari ini)' : ''),
+    short: k => { const d = dateOf(k); return `${HARI[d.getUTCDay()]} ${d.getUTCDate()}`; },
+    title: k => `Rekap Harian Area — ${dayText(k)}`,
+    prevNote: 'hari yang sama minggu lalu', prevShort: k => `${HARI[dateOf(k).getUTCDay()]} lalu`, trendN: 8, noun: 'hari'
+  },
+  week: {
+    cur: CUR_WEEK, prev: k => shiftWeek(k, -1),
+    label: k => `${weekNo(k)} · ${weekRange(k)}${k===CUR_WEEK ? ' (berjalan)' : ''}`,
+    short: weekNo,
+    title: k => `Rekap Mingguan Area — ${weekNo(k)} (${weekRange(k)})`,
+    prevNote: 'minggu sebelumnya', prevShort: () => 'minggu lalu', trendN: 8, noun: 'minggu'
+  },
+  month: {
+    cur: CUR_MONTH, prev: k => shiftMonth(k, -1),
+    label: k => monthText(k) + (k===CUR_MONTH ? ` (${upToToday()})` : ''),
+    opt: k => monthText(k) + (k===CUR_MONTH ? ' (berjalan)' : ''),
+    short: k => BULAN[+k.slice(5)-1],
+    title: k => `Rekap Bulanan Area — ${monthText(k)}${k===CUR_MONTH ? ' ' + upToToday() : ''}`,
+    prevNote: 'bulan sebelumnya', prevShort: () => 'bulan lalu', trendN: 6, noun: 'bulan'
+  }
+};
 
 /* ================= Baca feed ================= */
 function parseCSV(text){
@@ -311,38 +373,123 @@ function parseCSV(text){
   if (cell!=='' || row.length){ row.push(cell); rows.push(row); }
   return rows;
 }
-// Angka dari CSV Sheets: "34.9", "34,9", "328553000", "328,553,000", "328.553.000"
+// Angka dari CSV Sheets: "34.9", "34,9", "328553000", "328,553,000", "328.553.000", "-" (kosong)
 function sheetNum(s){
   s = String(s==null?'':s).trim().replace(/\s|Rp|%/g,'');
-  if (s==='' || s[0]==='#') return null;
+  if (s==='' || s==='-' || s[0]==='#') return null;
   if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
   if (/^-?\d+,\d{1,2}$/.test(s)) return Number(s.replace(',', '.'));
   if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g,''));
   if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return Number(s.replace(/\./g,'').replace(',', '.'));
   const n = Number(s); return isFinite(n) ? n : null;
 }
-// Kolom: Minggu, Senin, Center, Show Up, Paid DP, Paid Full, Acquisition, Target Acquisition, Revenue, Target Revenue, CVR %, DP to FP %
-function parseFeed(text){
+const refErrIn = text => /#REF!/.test(text.slice(0, 400));
+// CVR = total paid / show up, DP → FP = paid full / total paid (sama dengan tab 02 Acquisition)
+function entry(o){
+  const paid = (o.paidDp||0) + (o.paidFull||0);
+  o.actual = o.actual || 0;
+  o.cvr = o.showUp > 0 ? paid/o.showUp*100 : null;
+  o.dpfp = paid > 0 ? (o.paidFull||0)/paid*100 : null;
+  return o;
+}
+
+// Mingguan. Kolom: Minggu, Senin, Center, Show Up, Paid DP, Paid Full, Acquisition, Target Acquisition, Revenue, Target Revenue, CVR %, DP to FP %
+function parseWeek(text){
   const rows = parseCSV(text);
   const hi = rows.findIndex(r => (r[0]||'').trim()==='Minggu' && (r[2]||'').trim()==='Center');
-  if (hi < 0) return {entries:[], refErr: /#REF!/.test(text), headerMissing:true};
-  const entries = []; let refErr = false;
+  if (hi < 0) return {entries:[], refErr: refErrIn(text)};
+  const entries = [];
   for (const r of rows.slice(hi+1)){
     const wk = (r[0]||'').trim(), c = (r[2]||'').trim().toUpperCase();
-    if (wk.startsWith('#')){ refErr = true; continue; }
     if (!/^\d{4}-W\d{2}$/.test(wk) || !CENTERS.includes(c)) continue;
     const [showUp, dp, full, acq, tgtA, rev, tgtR, cvr, dpfp] = [3,4,5,6,7,8,9,10,11].map(i => sheetNum(r[i]));
-    if ((showUp||0) + (acq||0) + (rev||0) <= 0) continue;     // minggu tanpa aktivitas
-    entries.push({center:c, week:wk, showUp, paidDp:dp, paidFull:full,
+    entries.push({center:c, key:wk, showUp, paidDp:dp, paidFull:full,
       actual: acq||0, target: tgtA>0 ? tgtA : null,
       cvr: showUp>0 ? cvr : null, dpfp: (acq||0)>0 ? dpfp : null,
       rev, revTarget: tgtR>0 ? tgtR : null});
   }
-  return {entries, refErr};
+  return {entries};
 }
 
-// Sheet yang dibagikan "siapa saja yang punya link" bisa dibaca langsung dari browser.
-// export?format=csv membaca nilai apa adanya; gviz cadangan bila export diblokir.
+// Bulanan: tab "02 Acquisition", bagian A (per center) untuk Reporting Month di Exboard
+const MONTHS_EN = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+const MONTHS_ID = BULAN_PJG.map(m => m.toLowerCase());
+function monthKey(s){
+  const m = /([A-Za-z]+)\s+(\d{4})/.exec(s || ''); if (!m) return null;
+  const n = m[1].toLowerCase();
+  let i = MONTHS_EN.indexOf(n); if (i < 0) i = MONTHS_ID.indexOf(n);
+  if (i < 0) i = MONTHS_EN.findIndex(x => x.slice(0,3)===n.slice(0,3));
+  return i < 0 ? null : m[2] + '-' + pad2(i+1);
+}
+function parseMonth(text){
+  const rows = parseCSV(text);
+  const pr = rows.find(r => norm(r[0]).startsWith('reporting month'));
+  const key = pr ? monthKey(pr[1]) : null;
+  const hi = rows.findIndex(r => norm(r[0])==='center' && norm(r[1])==='leads');
+  if (!key || hi < 0) return {entries:[], refErr: refErrIn(text)};
+  const head = rows[hi].map(norm), col = n => head.indexOf(n);
+  const ix = {showUp:col('show up'), paidDp:col('paid dp'), paidFull:col('paid full'),
+    acq: col('acquisition') >= 0 ? col('acquisition') : col('fp sd'), rev:col('revenue'), tgtR:col('target rev'), tgtA:col('target')};
+  const raw = [];
+  for (const r of rows.slice(hi+1)){
+    const c = (r[0]||'').trim().toUpperCase();
+    if (c==='TOTAL' || /^[A-Z]\.\s/.test(r[0]||'')) break;
+    if (!CENTERS.includes(c)) continue;
+    const v = k => ix[k] >= 0 ? sheetNum(r[ix[k]]) : null;
+    raw.push({center:c, showUp:v('showUp'), paidDp:v('paidDp'), paidFull:v('paidFull'), acq:v('acq'), rev:v('rev'), tgtR:v('tgtR'), tgtA:v('tgtA')});
+  }
+  // Exboard menampilkan Revenue & Target Rev dalam ribuan rupiah (600,000 = Rp 600 jt)
+  const unit = raw.some(e => e.tgtR > 0 && e.tgtR < 1e7) ? 1000 : 1;
+  // Bulan berjalan: target dipro-rata sampai hari ini, sama seperti "Ach vs Run-Rate" di Exboard
+  const dim = daysInMonth(key), frac = key===CUR_MONTH ? Math.min(Number(TODAY.slice(8)), dim)/dim : key < CUR_MONTH ? 1 : 0;
+  const entries = raw.map(e => entry({center:e.center, key, showUp:e.showUp, paidDp:e.paidDp, paidFull:e.paidFull,
+    actual:e.acq, rev: e.rev!=null ? e.rev*unit : null,
+    target: e.tgtA > 0 && frac > 0 ? e.tgtA*frac : null, revTarget: e.tgtR > 0 && frac > 0 ? e.tgtR*unit*frac : null}));
+  return {entries};
+}
+
+// Harian: tab "Feed Harian" di Exboard. Kolom: Tanggal (yyyy-mm-dd), Center, Show Up, Paid DP, Paid Full,
+// Acquisition, Revenue, Target Acquisition, Target Revenue (target = target bulanan ÷ jumlah hari bulan itu)
+function parseDate(s){
+  s = String(s||'').trim(); let m;
+  if ((m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s))) return `${m[3]}-${pad2(m[1])}-${pad2(m[2])}`;
+  return null;
+}
+function parseDay(text){
+  const rows = parseCSV(text);
+  const hi = rows.findIndex(r => norm(r[0])==='tanggal' && norm(r[1])==='center');
+  if (hi < 0) return {entries:[], refErr: refErrIn(text)};
+  const head = rows[hi].map(norm), col = n => head.indexOf(n);
+  const ix = {showUp:col('show up'), paidDp:col('paid dp'), paidFull:col('paid full'), acq:col('acquisition'),
+    rev:col('revenue'), tgtA:col('target acquisition'), tgtR:col('target revenue')};
+  const raw = [];
+  for (const r of rows.slice(hi+1)){
+    const key = parseDate(r[0]), c = (r[1]||'').trim().toUpperCase();
+    if (!key || key > TODAY || !CENTERS.includes(c)) continue;
+    const v = k => ix[k] >= 0 ? sheetNum(r[ix[k]]) : null;
+    raw.push({center:c, key, showUp:v('showUp'), paidDp:v('paidDp'), paidFull:v('paidFull'), actual:v('acq'), rev:v('rev'), target:v('tgtA'), revTarget:v('tgtR')});
+  }
+  // Target revenue harian ± Rp 20 jt; kalau tercatat ribuan (± 20.000), revenue juga ribuan
+  const maxT = Math.max(0, ...raw.map(e => e.revTarget || 0));
+  const unit = maxT > 0 && maxT < 1e6 ? 1000 : 1;
+  raw.forEach(e => { if (e.rev!=null) e.rev *= unit; if (e.revTarget!=null) e.revTarget *= unit; });
+  return {entries: raw.map(entry)};
+}
+const PARSE = {week: parseWeek, month: parseMonth, day: parseDay};
+
+// Harian → mingguan / bulanan: jumlahkan hitungan & target, lalu hitung ulang rasio
+function rollup(daily, keyOf){
+  const m = new Map();
+  for (const d of daily){
+    const k = keyOf(d.key), id = d.center + '|' + k;
+    const a = m.get(id) || {center:d.center, key:k, showUp:0, paidDp:0, paidFull:0, actual:0, rev:0, target:0, revTarget:0};
+    ['showUp','paidDp','paidFull','actual','rev','target','revTarget'].forEach(f => a[f] += d[f] || 0);
+    m.set(id, a);
+  }
+  return [...m.values()].map(entry);
+}
+
 async function fetchPublicCsv(id){
   const urls = [
     `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
@@ -390,21 +537,41 @@ function progressBar(pct, s){
 }
 
 /* ================= State ================= */
-let idx = new Map(), weeks = [], data = null, week = null, pulling = false;
-const get = (c, w) => idx.get(c + '|' + w) || null;
-function setData(text, pulledAt){
-  const p = parseFeed(text);
-  if (!p.entries.length) return p;
-  idx = new Map(p.entries.map(e => [e.center + '|' + e.week, e]));
-  weeks = Array.from(new Set(p.entries.map(e => e.week))).sort().reverse();
-  data = {pulledAt, refErr: p.refErr};
-  if (!week || !weeks.includes(week)) week = defaultWeek();
-  return p;
+const raw = {week:null, month:null, day:null};       // {entries, pulledAt} per feed
+let store = {};                                      // per jenis periode: {idx, keys, src}
+let ui = Object.assign({mode:'week'}, lsGet(UI_KEY) || {});
+if (!P[ui.mode]) ui.mode = 'week';
+const sel = {day:null, week:null, month:null};
+let pulling = false;
+
+const active = e => (e.showUp||0) + (e.actual||0) + (e.rev||0) > 0;
+function mk(list, src){
+  list = list.filter(active);
+  return {idx: new Map(list.map(e => [e.center + '|' + e.key, e])), keys: [...new Set(list.map(e => e.key))].sort().reverse(), src};
 }
-function defaultWeek(){ return weeks.find(w => w <= CUR_WEEK) || weeks[0] || CUR_WEEK; }
-function weekRows(w){
-  const pw = shiftWeek(w, -1);
-  return CENTERS.map(c => ({center:c, e: derive(get(c, w)), p: derive(get(c, pw))}));
+// Tabel harian (Acquisition = FP SD Exboard) jadi sumber utama untuk ketiga periode supaya angkanya konsisten.
+// Selama belum ada: mingguan dari feed mingguan, bulanan dari tab 02 Acquisition.
+function build(){
+  const daily = raw.day && raw.day.entries.length ? raw.day.entries : null;
+  if (daily){
+    const first = daily.reduce((a, e) => e.key < a ? e.key : a, TODAY);
+    store.day = mk(daily, 'day');
+    store.week = mk(rollup(daily, k => isoWeekUTC(dateOf(k))).filter(e => isoOf(mondayOf(e.key)) >= first), 'day');
+    store.month = mk(rollup(daily, k => k.slice(0,7)).filter(e => e.key + '-01' >= first), 'day');
+  } else {
+    store.day = null;
+    store.week = raw.week ? mk(raw.week.entries, 'week') : null;
+    store.month = raw.month ? mk(raw.month.entries, 'month') : null;
+  }
+  Object.keys(P).forEach(m => { const s = store[m]; if (s && (!sel[m] || !s.keys.includes(sel[m]) && m!=='day')) sel[m] = defaultKey(m); });
+}
+function defaultKey(m){ const s = store[m]; if (!s) return P[m].cur; return s.keys.find(k => k <= P[m].cur) || s.keys[0] || P[m].cur; }
+const cur = () => store[ui.mode];
+const key = () => sel[ui.mode] || defaultKey(ui.mode);
+const get = (c, k) => { const s = cur(); return s ? s.idx.get(c + '|' + k) || null : null; };
+function periodRows(k){
+  const pk = P[ui.mode].prev(k);
+  return CENTERS.map(c => ({center:c, e: derive(get(c, k)), p: derive(get(c, pk))}));
 }
 function areaTotals(rows){
   const f = rows.filter(r => r.e);
@@ -427,28 +594,46 @@ function areaTotals(rows){
 function setStatus(kind, text){ const el = $('#status'); el.className = 'sync ' + kind; el.textContent = text; el.title = text; }
 function showErr(html){ const b = $('#errBox'); b.innerHTML = html || ''; b.hidden = !html; }
 
-function renderWeekbar(){
-  const sel = $('#wSel');
-  const list = weeks.length ? weeks : [CUR_WEEK];
-  sel.innerHTML = list.map(w => `<option value="${w}"${w===week?' selected':''}>${esc(weekLabel(w))}</option>`).join('');
-  const i = list.indexOf(week);
-  $('#wPrev').disabled = i < 0 || i >= list.length - 1;
-  $('#wNext').disabled = i <= 0;
-  $('#wLatest').disabled = !weeks.length || week === defaultWeek();
+function renderBar(){
+  const m = ui.mode, s = cur(), k = key();
+  document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode===m)));
+  const isDay = m==='day';
+  $('#wSel').hidden = isDay; $('#dSel').hidden = !isDay;
+  if (isDay){
+    const d = $('#dSel'), min = s && s.keys.length ? s.keys[s.keys.length-1] : '';
+    d.min = min; d.max = TODAY; d.value = k; d.disabled = !s;
+    $('#wPrev').disabled = !s || k <= min; $('#wNext').disabled = !s || k >= TODAY;
+  } else {
+    const list = s && s.keys.length ? s.keys : [k];
+    $('#wSel').innerHTML = list.map(x => `<option value="${x}"${x===k?' selected':''}>${esc((P[m].opt || P[m].label)(x))}</option>`).join('');
+    const i = list.indexOf(k);
+    $('#wPrev').disabled = i < 0 || i >= list.length - 1; $('#wNext').disabled = i <= 0;
+  }
+  $('#wLatest').disabled = !s || k === defaultKey(m);
+  $('#wLatest').textContent = isDay ? 'Hari ini' : 'Terbaru';
+}
+
+function setupHint(){
+  return `<div class="empty-state"><h2>Harian belum aktif</h2><p>Angka per tanggal perlu tab <b>Feed Harian</b> di Exboard (satu baris per tanggal per center, Acquisition dari FP SD). Setelah tab itu dibuat dan feed-nya tersambung, mode Harian aktif otomatis dan Mingguan / Bulanan ikut memakai angka yang sama.</p></div>`;
 }
 
 function render(){
-  renderWeekbar();
+  renderBar();
   renderFoot();
-  const el = $('#view');
-  if (!data){ if (!pulling) el.innerHTML = `<div class="empty-state"><h2>Belum ada data</h2><p>Data belum pernah berhasil ditarik di perangkat ini. Periksa pesan di atas, lalu ketuk tombol tarik ulang.</p></div>`; return; }
-  const w = week, rows = weekRows(w), tot = areaTotals(rows), ptot = areaTotals(weekRows(shiftWeek(w,-1)));
+  const el = $('#view'), m = ui.mode, s = cur();
+  if (!s){
+    if (m==='day'){ el.innerHTML = setupHint(); return; }
+    if (!pulling) el.innerHTML = `<div class="empty-state"><h2>Belum ada data</h2><p>Data belum pernah berhasil ditarik di perangkat ini. Periksa pesan di atas, lalu ketuk tombol tarik ulang.</p></div>`;
+    return;
+  }
+  const k = key(), rows = periodRows(k), tot = areaTotals(rows), ptot = areaTotals(periodRows(P[m].prev(k)));
   const dP = (a, b) => ptot ? delta(a, b) : '';
+  const tgtNote = (m==='month' && k===CUR_MONTH) || (m==='week' && k===CUR_WEEK && s.src==='day') ? '<span>target s.d. hari ini</span>' : '';
 
   const kpis = tot ? `<div class="kpis">
     <div class="kpi"><div class="k-label">Acquisition area</div>
       <div class="k-val">${fmt(tot.act,0)} <small>/ ${fmt(tot.tgt,1)}</small></div>
-      <div class="k-foot">${badge(tot.sAcq, fmtPct(tot.pct,0))}${dP(tot.pct, ptot&&ptot.pct)}</div></div>
+      <div class="k-foot">${badge(tot.sAcq, fmtPct(tot.pct,0))}${dP(tot.pct, ptot&&ptot.pct)}${tgtNote}</div></div>
     <div class="kpi"><div class="k-label">Revenue area</div>
       <div class="k-val">${tot.rev!=null ? fmtRpS(tot.rev) : '—'}</div>
       <div class="k-foot">${tot.rev!=null ? `${badge(tot.sRev, fmtPct(tot.revPct,0))}<span>dari ${fmtRpS(tot.revT)}</span>${dP(tot.revPct, ptot&&ptot.revPct)}` : '<span class="muted">Belum ada data</span>'}</div></div>
@@ -460,11 +645,11 @@ function render(){
       <div class="k-foot">${tot.dp!=null ? badge(tot.sDp) + dP(tot.dp, ptot&&ptot.dp) : '<span class="muted">Belum ada data</span>'}</div></div>
     <div class="kpi"><div class="k-label">Show up</div>
       <div class="k-val">${fmt(tot.showUp,0)}</div>
-      <div class="k-foot">${ptot ? `<span>minggu lalu ${fmt(ptot.showUp,0)}</span>` : ''}</div></div>
+      <div class="k-foot">${ptot ? `<span>${esc(P[m].prevShort(k))} ${fmt(ptot.showUp,0)}</span>` : ''}</div></div>
     <div class="kpi"><div class="k-label">Status center</div>
       <div class="k-val">${tot.dist.r} <small>merah</small></div>
       <div class="k-foot">${tot.dist.g?badge('g', tot.dist.g+' Hijau'):''}${tot.dist.y?badge('y', tot.dist.y+' Kuning'):''}${tot.dist.r?badge('r', tot.dist.r+' Merah'):''}</div></div>
-  </div>` : `<div class="empty-state"><h2>Belum ada data untuk ${esc(weekNo(w))}</h2><p>${esc(weekRange(w))}. Pilih minggu lain di atas.</p></div>`;
+  </div>` : `<div class="empty-state"><h2>Belum ada data untuk ${esc(P[m].label(k))}</h2><p>Tidak ada aktivitas tercatat. Pilih ${P[m].noun} lain di atas.</p></div>`;
 
   const metric = (label, val, b, bar, d) => `<div class="metric"><div class="m-label">${label}</div><div class="m-val">${val}</div><div class="m-row">${b}${d||''}</div>${bar||''}</div>`;
   const cards = rows.map(r => {
@@ -483,46 +668,52 @@ function render(){
     </article>`;
   }).join('');
 
+  const srcNote = s.src==='week' ? ' Acquisition mingguan saat ini = Paid DP + Paid Full dari feed mingguan; setelah tab Feed Harian ada, beralih ke Acquisition (FP SD) Exboard.'
+    : s.src==='month' ? ' Bulanan diambil dari tab 02 Acquisition (Acquisition & Revenue versi Exboard); hanya bulan yang sedang dipilih di Reporting Month Exboard.' : '';
+  const tn = P[m].trendN;
   el.innerHTML = `${kpis}
-    <div class="sec-head"><h2>Per center · ${esc(weekLabel(w))}</h2>
+    <div class="sec-head"><h2>Per center · ${esc(P[m].label(k))}</h2>
       <button class="btn sm" id="copyBtn" type="button" ${tot?'':'disabled'}><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>Salin ringkasan (WA)</button>
     </div>
     <div class="cards">${cards}</div>
-    <p class="note">▲▼ = perubahan dibanding minggu sebelumnya (poin persen). Status center = yang terburuk dari Acquisition, Revenue, CVR, dan DP → FP.</p>
-    <div class="sec-head"><h2>Tren acquisition vs target · ${TREND_N} minggu</h2><span class="note" style="margin:0">Ketuk minggu untuk membukanya</span></div>
-    <div class="table-wrap">${trendTable(w)}</div>
+    <p class="note">▲▼ = perubahan dibanding ${P[m].prevNote} (poin persen). Status center = yang terburuk dari Acquisition, Revenue, CVR, dan DP → FP.${esc(srcNote)}</p>
+    <div class="sec-head"><h2>Tren acquisition vs target · ${tn} ${P[m].noun}</h2><span class="note" style="margin:0">Ketuk kolom untuk membukanya</span></div>
+    <div class="table-wrap">${trendTable(k)}</div>
     <p class="note">Hijau ≥${TH.acq.green}% target, Kuning ${TH.acq.red}–${TH.acq.green}%, Merah &lt;${TH.acq.red}%. CVR: hijau ≥${TH.cvr.green}%, merah &lt;${TH.cvr.red}%. DP → FP: hijau ≥${TH.dp.green}%, merah &lt;${TH.dp.red}%.</p>`;
-  // Minggu terpilih ada di kolom paling kanan: geser tabel tren ke kanan agar langsung terlihat di HP
+  // Periode terpilih ada di kolom paling kanan: geser tabel tren ke kanan agar langsung terlihat di HP
   const tw = el.querySelector('.table-wrap'); if (tw) tw.scrollLeft = tw.scrollWidth;
 }
 
 function trendTable(end){
-  // ${TREND_N} minggu yang ada datanya, berakhir di minggu terpilih
-  const i = weeks.indexOf(end);
-  const ws = (i < 0 ? [] : weeks.slice(i, i + TREND_N)).reverse();
-  if (!ws.length) return '<p class="note" style="padding:12px">Belum ada data tren.</p>';
-  const cell = (e, w) => {
-    if (!e) return `<td class="${w===end?'cur':''}"><span class="muted">—</span></td>`;
-    return `<td class="${e.sAcq||''} ${w===end?'cur':''}" title="${esc(e.center||'Area')} ${weekNo(w)}: ${fmt(e.act!=null?e.act:e.actual,0)} / ${fmt(e.tgt!=null?e.tgt:e.target,1)}">${fmtPct(e.pct,0)}</td>`;
+  const m = ui.mode, s = cur(), n = P[m].trendN;
+  let ks;
+  if (m==='day'){ ks = []; for (let i = n-1; i >= 0; i--) ks.push(addDays(end, -i)); }
+  else { const i = s.keys.indexOf(end); ks = (i < 0 ? [] : s.keys.slice(i, i + n)).reverse(); }
+  if (!ks.length) return '<p class="note" style="padding:12px">Belum ada data tren.</p>';
+  const cell = (e, k) => {
+    if (!e) return `<td class="${k===end?'cur':''}"><span class="muted">—</span></td>`;
+    return `<td class="${e.sAcq||''} ${k===end?'cur':''}" title="${esc(e.center||'Area')} ${esc(P[m].short(k))}: ${fmt(e.act!=null?e.act:e.actual,0)} / ${fmt(e.tgt!=null?e.tgt:e.target,1)}">${fmtPct(e.pct,0)}</td>`;
   };
-  const head = ws.map(w => `<th class="${w===end?'cur':''}"><button type="button" data-week="${w}" title="${esc(weekRange(w))}">${weekNo(w)}</button></th>`).join('');
-  const body = CENTERS.map(c => `<tr><td class="lbl"><span class="dot" style="display:inline-block;margin-right:6px;background:${CCOLOR[c]}"></span>${c}</td>${ws.map(w => cell(derive(get(c,w)), w)).join('')}</tr>`).join('');
-  const area = `<tr class="area"><td class="lbl">Area</td>${ws.map(w => cell(areaTotals(weekRows(w)), w)).join('')}</tr>`;
+  const head = ks.map(k => `<th class="${k===end?'cur':''}"><button type="button" data-key="${k}" title="${esc(P[m].label(k))}">${esc(P[m].short(k))}</button></th>`).join('');
+  const body = CENTERS.map(c => `<tr><td class="lbl"><span class="dot" style="display:inline-block;margin-right:6px;background:${CCOLOR[c]}"></span>${c}</td>${ks.map(k => cell(derive(get(c,k)), k)).join('')}</tr>`).join('');
+  const area = `<tr class="area"><td class="lbl">Area</td>${ks.map(k => cell(areaTotals(periodRows(k)), k)).join('')}</tr>`;
   return `<table class="trend"><thead><tr><th class="lbl">Center</th>${head}</tr></thead><tbody>${body}${area}</tbody></table>`;
 }
 
+const feedUrl = m => `https://docs.google.com/spreadsheets/d/${SRC[m].id}/edit`;
 function renderFoot(){
-  const parts = [];
-  if (data) parts.push(`<span>${fmt(idx.size,0)} baris center-minggu · ditarik ${esc(fmtTime(data.pulledAt))}${data.refErr ? ' · sebagian baris di Sheet masih #REF!' : ''}.</span>`);
-  parts.push(`<span>Sumber: <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Rekap Mingguan Area (dari Exboard)</a>. Catatan coaching SA/CM hanya ada di dashboard claude.ai.</span>`);
+  const s = cur(), parts = [];
+  if (s && raw[s.src]) parts.push(`<span>Ditarik ${esc(fmtTime(raw[s.src].pulledAt))}.</span>`);
+  const src = s ? s.src : (ui.mode==='day' ? 'day' : ui.mode);
+  if (SRC[src].id) parts.push(`<span>Sumber: <a href="${feedUrl(src)}" target="_blank" rel="noopener">${esc(SRC[src].name)} (dari Exboard)</a>. Catatan coaching SA/CM hanya ada di dashboard claude.ai.</span>`);
   $('#foot').innerHTML = parts.join('');
 }
 
 function summaryText(){
-  const rows = weekRows(week), tot = areaTotals(rows);
+  const m = ui.mode, k = key(), rows = periodRows(k), tot = areaTotals(rows);
   if (!tot) return '';
   const E = s => s ? ST[s].emoji : '⚪';
-  const lines = [`*Rekap Mingguan Area — ${weekNo(week)} (${weekRange(week)})*`,
+  const lines = [`*${P[m].title(k)}*`,
     `Acquisition: ${fmt(tot.act,0)}/${fmt(tot.tgt,1)} (${fmtPct(tot.pct,0)}) ${E(tot.sAcq)}`];
   if (tot.rev!=null) lines.push(`Revenue: ${fmtRpS(tot.rev)}/${fmtRpS(tot.revT).replace('Rp ','')} (${fmtPct(tot.revPct,0)}) ${E(tot.sRev)}`);
   lines.push(`Rata-rata CVR: ${fmtPct(tot.cvr)} ${E(tot.sCvr)}`);
@@ -537,8 +728,8 @@ function summaryText(){
     lines.push(`${E(e.sAll)} *${r.center}* — ${parts.join(' | ')}`);
   });
   const attn = rows.filter(r => r.e && r.e.sAll==='r').map(r => {
-    const e = r.e, m = [e.sAcq==='r'?'Acq':'', e.sRev==='r'?'Revenue':'', e.sCvr==='r'?'CVR':'', e.sDp==='r'?'DP→FP':''].filter(Boolean);
-    return `${r.center} (${m.join(', ')})`;
+    const e = r.e, x = [e.sAcq==='r'?'Acq':'', e.sRev==='r'?'Revenue':'', e.sCvr==='r'?'CVR':'', e.sDp==='r'?'DP→FP':''].filter(Boolean);
+    return `${r.center} (${x.join(', ')})`;
   });
   if (attn.length) lines.push('', `Perlu perhatian: ${attn.join('; ')}`);
   return lines.join('\n');
@@ -554,55 +745,80 @@ async function copyText(t){
 }
 
 /* ================= Tarik data ================= */
-function errText(err){
+function errLine(m, err){
+  const link = `<a href="${feedUrl(m)}" target="_blank" rel="noopener">${esc(SRC[m].name)}</a>`;
   if (err && err.code==='offline') return 'HP sedang offline.';
-  return `Sheet feed belum bisa dibaca dari aplikasi ini. Pemilik Sheet perlu membuka <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Rekap Mingguan Area</a> → Bagikan → Akses umum → <b>Siapa saja yang memiliki link</b> (Viewer).`;
+  if (err && err.code==='empty') return err.refErr ? `${link} belum bisa membaca Exboard: buka Sheet-nya, klik sel A1, lalu pilih "Allow access".`
+    : `${link} belum berisi tabel yang dikenali.`;
+  return `${link} belum bisa dibaca dari aplikasi ini. Buka Sheet-nya → Bagikan → Akses umum → <b>Siapa saja yang memiliki link</b> (Viewer).`;
+}
+function load(m, text, pulledAt){
+  const p = PARSE[m](text);
+  if (!p.entries.length) return p;
+  raw[m] = {entries: p.entries, pulledAt};
+  return p;
+}
+async function pullOne(m){
+  if (!SRC[m].id) return;
+  const text = await fetchPublicCsv(SRC[m].id);
+  const now = Date.now(), p = load(m, text, now);
+  if (!p.entries.length) throw {code:'empty', refErr: p.refErr};
+  lsSet(SRC[m].cache, {text, pulledAt: now});
 }
 async function pull(){
   if (pulling) return;
   pulling = true; $('#pullBtn').disabled = true; $('#pullBtn').classList.add('spin');
   setStatus('busy', 'Menarik data…');
-  try {
-    const text = await fetchPublicCsv(FEED_ID);
-    const now = Date.now(), p = setData(text, now);
-    if (!p.entries.length){
-      setStatus('err', 'Feed belum siap');
-      showErr(p.refErr ? `<b>Sheet feed belum bisa membaca Exboard.</b> Buka <a href="${FEED_URL}" target="_blank" rel="noopener">Sheet feed</a>, klik sel A1, lalu pilih "Allow access".`
-        : `<b>Tidak ada data mingguan yang terbaca.</b> Pastikan tab pertama Sheet feed berisi tabel dengan kolom Minggu dan Center.`);
-    } else {
-      lsSet(CACHE_KEY, {text, pulledAt: now});
-      setStatus('ok', 'Tersinkron · ' + fmtTime(now));
-      showErr('');
-    }
-  } catch(err){
-    setStatus('err', data ? 'Data ' + fmtTime(data.pulledAt) : 'Gagal menarik');
-    showErr(`<b>Data terbaru belum bisa ditarik.</b> ${errText(err)}${data ? ` Menampilkan data terakhir (${esc(fmtTime(data.pulledAt))}).` : ''}`);
-  } finally {
-    pulling = false; $('#pullBtn').disabled = false; $('#pullBtn').classList.remove('spin');
-    render();
+  const modes = Object.keys(SRC).filter(m => SRC[m].id);
+  const res = await Promise.allSettled(modes.map(pullOne));
+  build();
+  const failed = modes.map((m, i) => [m, res[i]]).filter(([, r]) => r.status==='rejected');
+  if (!failed.length){ setStatus('ok', 'Tersinkron · ' + fmtTime(Date.now())); showErr(''); }
+  else {
+    const offline = failed.some(([, r]) => r.reason && r.reason.code==='offline');
+    setStatus('err', offline ? 'Offline' : failed.length===modes.length ? 'Gagal menarik' : 'Sebagian gagal');
+    const uniq = [...new Set(failed.map(([m, r]) => errLine(m, r.reason)))];
+    showErr(`<b>Sebagian data terbaru belum bisa ditarik.</b> ${uniq.join(' ')}${cur() ? ' Menampilkan data terakhir yang tersimpan.' : ''}`);
   }
+  pulling = false; $('#pullBtn').disabled = false; $('#pullBtn').classList.remove('spin');
+  render();
 }
 
 /* ================= Event ================= */
-function setWeek(w){ if (!w || w===week) return; week = w; render(); window.scrollTo({top:0}); }
-$('#wSel').addEventListener('change', e => setWeek(e.target.value));
-$('#wPrev').addEventListener('click', () => { const i = weeks.indexOf(week); if (i >= 0 && i < weeks.length-1) setWeek(weeks[i+1]); });
-$('#wNext').addEventListener('click', () => { const i = weeks.indexOf(week); if (i > 0) setWeek(weeks[i-1]); });
-$('#wLatest').addEventListener('click', () => setWeek(defaultWeek()));
+function setKey(k){ if (!k || k===sel[ui.mode]) return; sel[ui.mode] = k; render(); window.scrollTo({top:0}); }
+function setMode(m){ if (!P[m] || m===ui.mode) return; ui.mode = m; lsSet(UI_KEY, ui); render(); }
+$('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode); });
+$('#wSel').addEventListener('change', e => setKey(e.target.value));
+$('#dSel').addEventListener('change', e => { const v = e.target.value; if (v && v <= TODAY) setKey(v); });
+function step(dir){
+  const m = ui.mode, s = cur(), k = key(); if (!s) return;
+  if (m==='day'){ const n = addDays(k, dir); const min = s.keys[s.keys.length-1]; if (n <= TODAY && n >= min) setKey(n); return; }
+  const i = s.keys.indexOf(k), j = i - dir;                // keys urut terbaru → terlama
+  if (i >= 0 && j >= 0 && j < s.keys.length) setKey(s.keys[j]);
+}
+$('#wPrev').addEventListener('click', () => step(-1));
+$('#wNext').addEventListener('click', () => step(1));
+$('#wLatest').addEventListener('click', () => setKey(defaultKey(ui.mode)));
 $('#pullBtn').addEventListener('click', pull);
 $('#view').addEventListener('click', async e => {
-  const wb = e.target.closest('button[data-week]');
-  if (wb){ setWeek(wb.dataset.week); return; }
+  const kb = e.target.closest('button[data-key]');
+  if (kb){ setKey(kb.dataset.key); return; }
   if (e.target.closest('#copyBtn')) toast(await copyText(summaryText()) ? 'Ringkasan disalin. Tempel di WhatsApp.' : 'Gagal menyalin ringkasan.');
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && (!data || Date.now() - data.pulledAt > STALE_MS)) pull();
+  if (document.visibilityState !== 'visible') return;
+  const s = cur(), last = s && raw[s.src] ? raw[s.src].pulledAt : 0;
+  if (Date.now() - last > STALE_MS) pull();
 });
 
 /* ================= Mulai ================= */
 try { localStorage.setItem(LAST_KEY, 'rekap'); } catch(e){}
-const cached = lsGet(CACHE_KEY);
-if (cached && typeof cached.text === 'string' && setData(cached.text, cached.pulledAt).entries.length) setStatus('', 'Data ' + fmtTime(cached.pulledAt));
+Object.keys(SRC).forEach(m => {
+  const c = lsGet(SRC[m].cache);
+  if (SRC[m].id && c && typeof c.text === 'string') load(m, c.text, c.pulledAt);
+});
+build();
+if (cur()) setStatus('', 'Data ' + fmtTime((raw[cur().src] || {}).pulledAt));
 render();
 pull();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});

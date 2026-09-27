@@ -4,7 +4,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP:
 
 | Halaman | Isi | Sumber data |
 |---|---|---|
-| `rekap/` | Rekap Mingguan Area: acquisition, revenue, CVR, DP → FP per center, tren 8 minggu, salin ringkasan WA | Sheet **Feed Rekap Mingguan Area (dari Exboard)** |
+| `rekap/` | Rekap Area harian / mingguan / bulanan: acquisition, revenue, CVR, DP → FP per center, tren, salin ringkasan WA | **Feed Rekap Harian** (tab Feed Harian, belum dibuat), **Feed Rekap Bulanan** (tab 02 Acquisition), **Feed Rekap Mingguan Area** |
 | `sa/` | Acquisition per SA: CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue per Student Advisor, filter center, urutkan per metrik, detail funnel & alasan gagal | Sheet **Feed Acquisition SA (dari Exboard)** (tab 02B Acquisition SA) |
 | `slot-map/` | Slot Map Kelas: age group, keterisian & coach per slot | Sheet **Feed Slot Map (dari Exboard)** |
 
@@ -38,4 +38,8 @@ Kalau dibuka lewat claude.ai (artifact), `slot-map/` tetap membaca lewat connect
 - Warna di halaman SA: CVR / CVR Baby Tiny / Full Pay Rate hijau bila ≥ rata-rata area, merah bila 30% di bawahnya.
 - CVR Baby Tiny = (paid Baby + paid Tiny) / (show up Baby + show up Tiny), dari bagian B tab 02B
   (paid per segmen = show up × CVR segmen). Kolom BT di sheet tidak dipakai karena pembaginya berbeda.
+- Rekap: begitu tab **Feed Harian** ada di Exboard dan ID feed-nya diisi di `SRC.day` (`rekap/index.html`),
+  harian, mingguan dan bulanan semuanya dihitung dari tabel itu (Acquisition = FP SD, Revenue dari Revenue Record).
+  Sebelum itu: mingguan dari feed mingguan (Acquisition = Paid DP + Paid Full), bulanan dari tab 02 Acquisition
+  (hanya Reporting Month yang sedang dipilih di Exboard). Target bulan/minggu berjalan dipro-rata sampai hari ini.
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.
