@@ -8,17 +8,16 @@ Tempel rumus ini di sel **A1** tab `Feed Harian` (kosongkan sisa tab):
 
 ```
 =ARRAYFORMULA(LET(
-  ctr, {"KLM";"KWC";"PML";"TMP";"BTU";"HIB"},
   mulai, EOMONTH(TODAY(),-4)+1,
   i, SEQUENCE((TODAY()-mulai+1)*6),
   tgl, mulai+INT((i-1)/6),
-  c, INDEX(ctr, MOD(i-1,6)+1),
-  su, COUNTIFS('Register Trial'!$A$2:$A, c, 'Register Trial'!$B$2:$B, ">="&tgl, 'Register Trial'!$B$2:$B, "<"&(tgl+1), 'Register Trial'!$N$2:$N, TRUE),
-  dp, COUNTIFS('Register Trial'!$A$2:$A, c, 'Register Trial'!$B$2:$B, ">="&tgl, 'Register Trial'!$B$2:$B, "<"&(tgl+1), 'Register Trial'!$O$2:$O, "Regis Fee only"),
-  fp, COUNTIFS('Register Trial'!$A$2:$A, c, 'Register Trial'!$B$2:$B, ">="&tgl, 'Register Trial'!$B$2:$B, "<"&(tgl+1), 'Register Trial'!$O$2:$O, "Regis + Member Fee")
-    + COUNTIFS('Register Trial'!$A$2:$A, c, 'Register Trial'!$B$2:$B, ">="&tgl, 'Register Trial'!$B$2:$B, "<"&(tgl+1), 'Register Trial'!$O$2:$O, "Member Fee"),
-  acq, COUNTIFS('Student Database'!$A$2:$A, c, 'Student Database'!$BZ$2:$BZ, ">="&tgl, 'Student Database'!$BZ$2:$BZ, "<"&(tgl+1), 'Student Database'!$E$2:$E, "Full"),
-  rev, SUMIFS('Revenue Record'!$H$2:$H, 'Revenue Record'!$A$2:$A, c, 'Revenue Record'!$S$2:$S, ">="&tgl, 'Revenue Record'!$S$2:$S, "<"&(tgl+1)),
+  c, CHOOSE(MOD(i-1,6)+1, "KLM","KWC","PML","TMP","BTU","HIB"),
+  su, MAP(tgl, c, LAMBDA(t, k, COUNTIFS('Register Trial'!$A$2:$A, k, 'Register Trial'!$B$2:$B, ">="&t, 'Register Trial'!$B$2:$B, "<"&(t+1), 'Register Trial'!$N$2:$N, TRUE))),
+  dp, MAP(tgl, c, LAMBDA(t, k, COUNTIFS('Register Trial'!$A$2:$A, k, 'Register Trial'!$B$2:$B, ">="&t, 'Register Trial'!$B$2:$B, "<"&(t+1), 'Register Trial'!$O$2:$O, "Regis Fee only"))),
+  fp, MAP(tgl, c, LAMBDA(t, k, COUNTIFS('Register Trial'!$A$2:$A, k, 'Register Trial'!$B$2:$B, ">="&t, 'Register Trial'!$B$2:$B, "<"&(t+1), 'Register Trial'!$O$2:$O, "Regis + Member Fee")
+    + COUNTIFS('Register Trial'!$A$2:$A, k, 'Register Trial'!$B$2:$B, ">="&t, 'Register Trial'!$B$2:$B, "<"&(t+1), 'Register Trial'!$O$2:$O, "Member Fee"))),
+  acq, MAP(tgl, c, LAMBDA(t, k, COUNTIFS('Student Database'!$A$2:$A, k, 'Student Database'!$BZ$2:$BZ, ">="&t, 'Student Database'!$BZ$2:$BZ, "<"&(t+1), 'Student Database'!$E$2:$E, "Full"))),
+  rev, MAP(tgl, c, LAMBDA(t, k, SUMIFS('Revenue Record'!$H$2:$H, 'Revenue Record'!$A$2:$A, k, 'Revenue Record'!$S$2:$S, ">="&t, 'Revenue Record'!$S$2:$S, "<"&(t+1)))),
   hari, DAY(EOMONTH(tgl,0)),
   ta, VLOOKUP(c, '02 Acquisition'!$A$7:$N$12, 14, FALSE)/hari,
   tr, VLOOKUP(c, '02 Acquisition'!$A$7:$L$12, 12, FALSE)/hari,
@@ -35,6 +34,7 @@ Tempel rumus ini di sel **A1** tab `Feed Harian` (kosongkan sisa tab):
 | Revenue | Revenue Record kolom H, tanggal kolom S (rumus K7 tab 02 Acquisition) |
 | Target | Target bulanan tab 02 Acquisition (kolom N dan L) ÷ jumlah hari bulan itu |
 
+- COUNTIFS/SUMIFS/INDEX tidak ikut ARRAYFORMULA di Google Sheets, jadi tiap kolom dihitung per baris dengan MAP.
 - Rentang: awal bulan 3 bulan lalu s.d. hari ini (± 4 bulan). Ubah `-4` di `EOMONTH(TODAY(),-4)` untuk lebih panjang/pendek.
 - Kalau Exboard memakai format angka Indonesia dan rumus error, ganti pemisah `,` menjadi `;`
   (dan `{"KLM";"KWC";…}` menjadi `{"KLM"\"KWC"\…}` hanya bila Sheets meminta).
