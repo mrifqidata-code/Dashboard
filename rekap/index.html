@@ -253,8 +253,8 @@ const SRC = {
   week:  {id:'122A4RyzPQQzyLU8Q8dpv8KYn7D6SBLJtn4BMlwnkQtc', name:'Feed Rekap Mingguan Area', cache:'rekapLite.cache.v1'},
   // IMPORTRANGE tab "02 Acquisition": bulan berjalan per center (Acquisition & Revenue versi Exboard).
   month: {id:'1AENDIBlBmmf6K9axK06RdvDCDgUHw_6kqDeAjcT7ww4', name:'Feed Rekap Bulanan', cache:'rekapLite.month.v1'},
-  // IMPORTRANGE tab "Feed Harian": satu baris per tanggal per center. Isi ID-nya setelah tab itu dibuat di Exboard.
-  day:   {id:'', name:'Feed Rekap Harian', cache:'rekapLite.day.v1'}
+  // IMPORTRANGE tab "Feed Harian": satu baris per tanggal per center (Acquisition = FP SD, Revenue dari Revenue Record).
+  day:   {id:'1rUNdkegRQQ6PICdcb1-9uQzTZAfQk8e_vPDMNX8zmyw', name:'Feed Rekap Harian', cache:'rekapLite.day.v1'}
 };
 const CENTERS = ['KLM','KWC','PML','BTU','TMP','HIB'];
 const CCOLOR = {KLM:'var(--s1)',KWC:'var(--s2)',PML:'var(--s3)',BTU:'var(--s4)',TMP:'var(--s5)',HIB:'var(--s6)'};
@@ -614,7 +614,7 @@ function renderBar(){
 }
 
 function setupHint(){
-  return `<div class="empty-state"><h2>Harian belum aktif</h2><p>Angka per tanggal perlu tab <b>Feed Harian</b> di Exboard (satu baris per tanggal per center, Acquisition dari FP SD). Setelah tab itu dibuat dan feed-nya tersambung, mode Harian aktif otomatis dan Mingguan / Bulanan ikut memakai angka yang sama.</p></div>`;
+  return `<div class="empty-state"><h2>Harian belum aktif</h2><p>Angka per tanggal dibaca dari tab <b>Feed Harian</b> di Exboard lewat <a href="${feedUrl('day')}" target="_blank" rel="noopener">Feed Rekap Harian</a>. Pastikan tab itu sudah dibuat, feed-nya sudah diberi izin (klik A1 → Allow access) dan dibagikan "Siapa saja yang memiliki link". Setelah itu mode Harian aktif otomatis dan Mingguan / Bulanan ikut memakai angka yang sama.</p></div>`;
 }
 
 function render(){
