@@ -15,7 +15,11 @@
 (function(){
   var last = null;
   try { last = localStorage.getItem('dashboardApp.last'); } catch(e){}
-  location.replace(last === 'slot-map' ? 'slot-map/' : last === 'sa' ? 'sa/' : 'rekap/');
+  // Nilai lama ('rekap', 'slot-map', 'sa') dari versi sebelumnya ikut dipetakan
+  var map = {'rekap':'center/', 'slot-map':'kelas/', 'sa':'sa/'};
+  if (map[last]) last = map[last];
+  if (!/^(center|sa|kelas)\/([a-z-]+\/)?$/.test(last || '')) last = 'center/';
+  location.replace(last);
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,9 +34,9 @@ a{color:#1c5cab;font-weight:600}
 </head>
 <body>
 <nav>
-  <a href="rekap/">Rekap Mingguan Area</a>
-  <a href="sa/">Acquisition per SA</a>
-  <a href="slot-map/">Slot Map Kelas</a>
+  <a href="center/">Center</a>
+  <a href="sa/">Student Advisor</a>
+  <a href="kelas/">Kelas</a>
 </nav>
 </body>
 </html>

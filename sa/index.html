@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../assets/shell.css">
 <style>
 :root{
   color-scheme: light;
@@ -70,16 +71,6 @@ h1,h2{margin:0;line-height:1.25}
 @media (max-width:480px){ .sync{max-width:132px;overflow:hidden;text-overflow:ellipsis} }
 
 /* App nav */
-.appnav{display:flex;gap:4px}
-.appnav a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;color:var(--ink-2);font-weight:600;font-size:14px;text-decoration:none}
-.appnav a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.appnav a:hover{background:var(--surface-2);color:var(--ink)}
-.appnav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
-@media (max-width:899px){
-  .appnav{position:fixed;left:0;right:0;bottom:0;z-index:30;gap:0;background:var(--surface);border-top:1px solid var(--border);padding:6px 6px calc(6px + env(safe-area-inset-bottom));justify-content:space-around}
-  .appnav a{flex:1;flex-direction:column;gap:2px;font-size:11.5px;padding:6px 2px}
-  .appnav a[aria-current="page"]{background:transparent}
-}
 
 /* Controls */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--border-2);background:var(--surface);cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
@@ -175,11 +166,6 @@ main{padding-top:16px}
       <span class="sync" id="status">Memuat…</span>
       <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
     </div>
-    <nav class="appnav" aria-label="Pilih dashboard">
-      <a href="../rekap/"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Rekap</a>
-      <a href="./" aria-current="page"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M16 11l2 2 3.5-4"/></svg>SA</a>
-      <a href="../slot-map/"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 4v16M16 4v16"/></svg>Slot Map</a>
-    </nav>
   </div>
 </header>
 
@@ -204,6 +190,7 @@ main{padding-top:16px}
   <div class="foot" id="foot"></div>
 </main>
 
+<script src="../assets/shell.js"></script>
 <script>
 (function(){
 'use strict';
@@ -218,7 +205,6 @@ const REV_UNIT = 1000;              // kolom Revenue di Exboard dalam ribuan rup
 const LOW = 0.7;                    // merah = 30% di bawah rata-rata area (aturan yang sama dengan tab 02B)
 const CACHE_KEY = 'saLite.cache.v1';
 const UI_KEY = 'saLite.ui.v1';
-const LAST_KEY = 'dashboardApp.last';
 const STALE_MS = 5 * 60 * 1000;
 const METRICS = {
   cvr:  {label:'CVR SU→Paid', short:'CVR SU→Paid'},
@@ -230,7 +216,7 @@ const METRICS = {
 
 /* ================= Util ================= */
 const $ = s => document.querySelector(s);
-const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const {esc, lsGet, lsSet, fmtTime, parseCSV, sheetNum, fetchPublicCsv} = DA;
 const fmt = (v, d=1) => (v==null || isNaN(v)) ? '—' : Number(v).toLocaleString('id-ID',{maximumFractionDigits:d});
 const fmtPct = (v, d=1) => (v==null || isNaN(v)) ? '—' : fmt(v,d) + '%';
 function fmtRpS(v){
@@ -242,40 +228,8 @@ function fmtRpS(v){
   return 'Rp ' + fmt(v, 0);
 }
 const fmtRp = v => (v==null || isNaN(v)) ? '—' : 'Rp ' + Math.round(v).toLocaleString('id-ID');
-function fmtTime(ts){
-  if (!ts) return '';
-  const d = new Date(ts);
-  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-}
-function lsGet(k){ try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch(e){ return null; } }
-function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
 
 /* ================= Baca feed ================= */
-function parseCSV(text){
-  const rows = []; let row = [], cell = '', q = false;
-  for (let i=0; i<text.length; i++){
-    const ch = text[i];
-    if (q){
-      if (ch==='"'){ if (text[i+1]==='"'){ cell += '"'; i++; } else q = false; }
-      else cell += ch;
-    } else if (ch==='"') q = true;
-    else if (ch===','){ row.push(cell); cell = ''; }
-    else if (ch==='\n'){ row.push(cell); rows.push(row); row = []; cell = ''; }
-    else if (ch!=='\r') cell += ch;
-  }
-  if (cell!=='' || row.length){ row.push(cell); rows.push(row); }
-  return rows;
-}
-// "95,000" · "48.9%" · "48,9" · "-" (kosong)
-function sheetNum(s){
-  s = String(s==null?'':s).trim().replace(/\s|Rp|%/g,'');
-  if (s==='' || s==='-' || s[0]==='#') return null;
-  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
-  if (/^-?\d+,\d{1,2}$/.test(s)) return Number(s.replace(',', '.'));
-  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g,''));
-  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return Number(s.replace(/\./g,'').replace(',', '.'));
-  const n = Number(s); return isFinite(n) ? n : null;
-}
 const norm = s => String(s||'').toLowerCase().replace(/\s+/g,' ').replace(/→/g,'>').trim();
 // Kolom dicari dari judulnya, jadi tetap terbaca bila urutan kolom di Exboard berubah
 const COLS = {
@@ -340,27 +294,10 @@ function parseFeed(text){
   return out;
 }
 
-async function fetchPublicCsv(id){
-  const urls = [
-    `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
-    `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`
-  ];
-  let lastErr = null;
-  for (const u of urls){
-    try {
-      const r = await fetch(u, {cache:'no-store', credentials:'omit'});
-      if (!r.ok){ lastErr = {code:'http', status:r.status}; continue; }
-      const t = await r.text();
-      if (/^\s*<(!doctype|html)/i.test(t)){ lastErr = {code:'private'}; continue; }
-      return t;
-    } catch(e){ lastErr = {code: navigator.onLine === false ? 'offline' : 'blocked', message: e && e.message}; }
-  }
-  throw lastErr || {code:'blocked'};
-}
 
 /* ================= State ================= */
 let data = null, pulling = false, openSet = new Set();
-let ui = Object.assign({center:'ALL', sort:'rev'}, lsGet(UI_KEY) || {});
+let ui = Object.assign({sort:'rev'}, lsGet(UI_KEY) || {}, {center: DA.center.get()});
 if (!METRICS[ui.sort]) ui.sort = 'rev';
 
 function setData(text, pulledAt){
@@ -392,8 +329,8 @@ function showErr(html){ const b = $('#errBox'); b.innerHTML = html || ''; b.hidd
 
 function renderChips(){
   const present = data ? CENTERS.filter(c => data.sas.some(s => s.center===c)) : CENTERS;
-  if (ui.center!=='ALL' && !present.includes(ui.center)) ui.center = 'ALL';
-  $('#chips').innerHTML = ['ALL'].concat(present).map(c => `<button type="button" class="chip" data-c="${c}" aria-pressed="${c===ui.center}">${c==='ALL'?'Semua':c}</button>`).join('');
+  // Pilihan center dipakai bersama semua halaman dashboard
+  ui.center = DA.centerChips($('#chips'), present, c => { ui.center = c; render(); });
   $('#sortSel').value = ui.sort;
 }
 
@@ -511,10 +448,6 @@ async function pull(){
 }
 
 /* ================= Event ================= */
-$('#chips').addEventListener('click', e => {
-  const b = e.target.closest('button[data-c]'); if (!b) return;
-  ui.center = b.dataset.c; lsSet(UI_KEY, ui); render();
-});
 $('#sortSel').addEventListener('change', e => { ui.sort = e.target.value; lsSet(UI_KEY, ui); render(); });
 $('#view').addEventListener('click', e => {
   const h = e.target.closest('button.sa-head'); if (!h) return;
@@ -529,12 +462,11 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ================= Mulai ================= */
-try { localStorage.setItem(LAST_KEY, 'sa'); } catch(e){}
+DA.mountNav('sa');
 const cached = lsGet(CACHE_KEY);
 if (cached && typeof cached.text === 'string' && setData(cached.text, cached.pulledAt).sas.length) setStatus('', 'Data ' + fmtTime(cached.pulledAt));
 render();
 pull();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});
 })();
 </script>
 </body>

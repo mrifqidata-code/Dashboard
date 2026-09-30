@@ -1,8 +1,8 @@
 // Service worker: halaman dashboard tetap bisa dibuka saat offline.
 // Network-first untuk file aplikasi (supaya update langsung terpakai); data Sheet tidak dicache di sini,
 // karena tiap halaman sudah menyimpan data terakhir di localStorage.
-const CACHE = 'dashboard-app-v2';
-const SHELL = ['./', 'index.html', 'rekap/', 'sa/', 'slot-map/', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'apple-touch-icon.png'];
+const CACHE = 'dashboard-app-v3';
+const SHELL = ['./', 'index.html', 'center/', 'sa/', 'kelas/', 'assets/shell.css', 'assets/shell.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {}));

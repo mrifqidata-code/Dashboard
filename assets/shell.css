@@ -1,0 +1,28 @@
+/* Kerangka bersama: menu kategori (bawah di HP, kanan atas di layar lebar), sub-menu, dan filter center.
+   Memakai token warna halaman (--accent, --surface, --border, --ink, …). */
+.appnav{display:flex;gap:4px}
+.appnav a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;color:var(--ink-2);font-weight:600;font-size:14px;text-decoration:none;white-space:nowrap}
+.appnav a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.appnav a:hover{background:var(--surface-2);color:var(--ink)}
+.appnav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.appnav a:focus-visible,.subnav a:focus-visible,.cchip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:899px){
+  body.has-appnav{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .appnav{position:fixed;left:0;right:0;bottom:0;z-index:30;gap:0;background:var(--surface);border-top:1px solid var(--border);padding:6px 6px calc(6px + env(safe-area-inset-bottom));justify-content:space-around}
+  .appnav a{flex:1;flex-direction:column;gap:2px;font-size:11.5px;padding:6px 2px}
+  .appnav a[aria-current="page"]{background:transparent}
+}
+
+.subnav{background:var(--surface);border-bottom:1px solid var(--border)}
+.subnav .wrap{display:flex;gap:6px;overflow-x:auto;padding-top:8px;padding-bottom:8px;scrollbar-width:none}
+.subnav .wrap::-webkit-scrollbar{display:none}
+.subnav a,.subnav span{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-weight:600;font-size:13.5px;color:var(--ink-2);text-decoration:none;white-space:nowrap;border:1px solid var(--border);flex:none}
+.subnav a:hover{background:var(--surface-2);color:var(--ink)}
+.subnav a[aria-current="page"]{background:var(--accent);color:var(--accent-ink,#fff);border-color:transparent}
+.subnav span.soon{color:var(--muted);border-style:dashed;cursor:default}
+.subnav span.soon small{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+
+.cchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:1px;min-width:0}
+.cchips::-webkit-scrollbar{display:none}
+.cchip{border:1px solid var(--border-2);background:var(--surface);border-radius:999px;padding:5px 12px;font:inherit;font-weight:700;font-size:13px;letter-spacing:.02em;color:var(--ink-2);cursor:pointer;white-space:nowrap;flex:none}
+.cchip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink,#fff);border-color:transparent}

@@ -1,15 +1,23 @@
 # Dashboard Area
 
-Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP:
+Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP. Satu aplikasi, tiga kategori
+(menu bawah), masing-masing dengan sub-menu (menu atas). Pilihan center (Semua / KLM / …) diingat di semua halaman.
 
-| Halaman | Isi | Sumber data |
-|---|---|---|
-| `rekap/` | Rekap Area harian / mingguan / bulanan: acquisition, revenue, CVR, DP → FP per center, tren, salin ringkasan WA | **Feed Rekap Harian** (tab Feed Harian), **Feed Rekap Bulanan** (tab 02 Acquisition), **Feed Rekap Mingguan Area** |
-| `sa/` | Acquisition per SA: CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue per Student Advisor, filter center, urutkan per metrik, detail funnel & alasan gagal | Sheet **Feed Acquisition SA (dari Exboard)** (tab 02B Acquisition SA) |
-| `slot-map/` | Slot Map Kelas: age group, keterisian & coach per slot | Sheet **Feed Slot Map (dari Exboard)** |
+| Kategori | Sub-menu | Folder | Sumber data |
+|---|---|---|---|
+| **Center** | Rekap Acquisition (harian / mingguan / bulanan) | `center/` | Feed Rekap Harian, Feed Rekap Bulanan, Feed Rekap Mingguan Area |
+| | Retention, Cash & Piutang | segera | Feed Dashboard Tambahan (tab 03, 12) |
+| **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
+| | Retention, PIP | segera | Feed Dashboard Tambahan (tab 03, 05) |
+| **Kelas** | Slot Map | `kelas/` | Feed Slot Map (Reguler Class Availability) |
+| | Utilisasi, Coach | segera | Feed Dashboard Tambahan (tab 08, 11) |
 
-`index.html` langsung membuka dashboard yang terakhir dilihat. Bisa dipasang ke home screen
-(manifest + service worker), dan data terakhir tetap tampil saat offline.
+- `assets/shell.js` + `assets/shell.css`: menu kategori & sub-menu (daftar di `NAV`), filter center bersama,
+  dan utilitas baca Sheet (`DA.fetchPublicCsv`, `DA.parseCSV`, `DA.sheetNum`). Sub-menu baru: tambah folder,
+  muat `../assets/shell.js`, panggil `DA.mountNav('<id>')`, lalu isi `href` di `NAV`.
+- `index.html` langsung membuka halaman terakhir yang dilihat. `rekap/` dan `slot-map/` hanya mengalihkan
+  ke `center/` dan `kelas/` (alamat lama).
+- Bisa dipasang ke home screen (manifest + service worker); data terakhir tetap tampil saat offline.
 
 ## Cara data dibaca
 
@@ -18,7 +26,7 @@ Karena itu **semua Sheet feed harus dibagikan "Siapa saja yang memiliki link" (V
 Siapa pun yang tahu ID Sheet bisa membaca isinya, termasuk angka revenue dan nama coach.
 Sheet Exboard sendiri tetap privat (feed mengambilnya lewat `IMPORTRANGE`).
 
-Kalau dibuka lewat claude.ai (artifact), `slot-map/` tetap membaca lewat connector Google Drive seperti sebelumnya.
+Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat connector Google Drive seperti sebelumnya.
 
 ## Pasang
 
