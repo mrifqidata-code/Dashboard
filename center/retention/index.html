@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Retention Center</title>
+<meta name="description" content="Retensi murid per center: cohort, retention rate, churn, status follow-up.">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../assets/shell.css">
+<link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body class="cat-center">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+    <div class="brand">
+      <h1>Retention</h1>
+      <p id="sub">Center</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('center-retention');
+let center = DA.center.get();
+const view = R.start({render, foot: 'Cohort = murid yang Last Class Date-nya jatuh di bulan tersebut. Retention rate = paid ÷ cohort.'});
+
+// Status follow-up retensi, urut dari paling aman ke paling berisiko
+const STATUS = [
+  ['Paid', 'Sudah bayar (retain)', 'var(--good)'],
+  ['Confirm to retain', 'Konfirmasi lanjut', '#6cc56c'],
+  ['Potential Renew', 'Potensi renew', '#9fd49f'],
+  ['Still Unsure', 'Masih ragu', 'var(--warn)'],
+  ['Asked — no response', 'Ditanya, belum jawab', '#f4cf73'],
+  ['Potential Churn', 'Potensi churn', '#ef8a7a'],
+  ['Churn', 'Churn', 'var(--crit)'],
+  ['Not yet asked', 'Belum ditanya', 'var(--muted)'],
+  ['Belum ada status', 'Belum ada status', 'var(--border-2)']
+];
+
+function render(secs){
+  center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
+  const sec = secs['03 Retention'];
+  const A = R.table(sec, /^A\. COHORT BULAN BERJALAN/i), B = R.table(sec, /^B\. TREND COHORT/i), D = R.table(sec, /^D\. CHURN REASON/i);
+  if (!A) return R.empty('Tabel retention belum terbaca', 'Bagian "A. Cohort bulan berjalan" tidak ditemukan di tab 03 Retention.');
+  const month = R.monthOf(sec);
+  $('#sub').textContent = `Cohort ${month}${center==='ALL' ? '' : ' · ' + center}`;
+  const key = center==='ALL' ? 'TOTAL' : center, row = A.row(key), tot = A.row('TOTAL');
+  const v = (r, n) => r ? R.num(A.get(r, n)) : null;
+  const cohort = v(row, 'Cohort');
+  let html = '';
+  if (!cohort){
+    html += R.empty(`Belum ada cohort retention untuk ${key}`, `Belum ada murid ${esc(key)} yang Last Class Date-nya jatuh di ${esc(month)}.`);
+  } else {
+    const rr = v(row, 'RETENTION RATE'), cr = v(row, 'Churn Rate'), totRR = v(tot, 'RETENTION RATE');
+    const tone = center==='ALL' || rr==null || totRR==null ? '' : rr >= totRR ? 'g' : rr < totRR*0.8 ? 'r' : 'y';
+    html += `<div class="kpis">
+      ${R.kpi('Retention rate', R.fmtPct(rr), `${R.fmt(v(row,'Paid'),0)} dari ${R.fmt(cohort,0)} murid${center==='ALL' ? '' : ` · area ${R.fmtPct(totRR)}`}`, tone)}
+      ${R.kpi('Churn rate', R.fmtPct(cr), `${R.fmt(v(row,'Churn'),0)} murid churn`)}
+      ${R.kpi('Cohort', R.fmt(cohort,0), 'murid selesai kelas bulan ini')}
+      ${R.kpi('Coverage', R.fmtPct(v(row,'Coverage %')), 'sudah dihubungi tim retensi')}
+    </div>`;
+    const items = STATUS.map(([k, label, color]) => ({label, color, n: v(row, k) || 0})).filter(x => x.n > 0);
+    html += `<div class="sec-head"><h2>Status follow-up · ${center==='ALL' ? 'semua center' : esc(key)}</h2></div>
+      <div class="card"><div class="stack">${items.map(x => `<i style="width:${x.n/cohort*100}%;background:${x.color}" title="${esc(x.label)}: ${x.n}"></i>`).join('')}</div>
+      <div style="margin-top:12px">${R.bars(items.map(x => ({label:x.label, value:x.n, text:R.fmt(x.n,0), sub:R.fmtPct(x.n/cohort*100,0)})), {max: cohort})}</div></div>`;
+  }
+  if (center==='ALL'){
+    const rows = DA.CENTERS.map(c => ({c, r: A.row(c)})).filter(x => x.r && v(x.r, 'Cohort'));
+    html += `<div class="sec-head"><h2>Per center</h2></div>` + R.tbl(['Center','Cohort','Paid','Churn','Retention','Churn rate','Coverage'],
+      rows.concat(tot ? [{c:'TOTAL', r: tot, tot: true}] : []).map(x => ({cls: x.tot ? 'tot' : '', cells:[esc(x.c), R.fmt(v(x.r,'Cohort'),0), R.fmt(v(x.r,'Paid'),0), R.fmt(v(x.r,'Churn'),0), R.fmtPct(v(x.r,'RETENTION RATE')), R.fmtPct(v(x.r,'Churn Rate')), R.fmtPct(v(x.r,'Coverage %'))]})));
+    const none = DA.CENTERS.filter(c => !rows.some(x => x.c===c));
+    if (none.length) html += `<p class="note">Belum ada cohort bulan ini: ${esc(none.join(', '))}.</p>`;
+  }
+  if (B){
+    // Hanya baris bulan ("Sep 2026"); bulan setelah Cohort Month belum jatuh tempo follow-up
+    const rows = B.rows.filter(r => /^[A-Z][a-z]{2} \d{4}$/.test(r[B.col]) && R.num(B.get(r,'Cohort')) > 0);
+    const curIdx = rows.findIndex(r => month.toLowerCase().startsWith(r[B.col].slice(0,3).toLowerCase()) && month.endsWith(r[B.col].slice(-4)));
+    html += `<div class="sec-head"><h2>Tren retention rate · semua center</h2><span class="note" style="margin:0">Per bulan cohort</span></div>
+      <div class="card">${R.bars(rows.map((r, i) => {
+        const future = curIdx >= 0 && i > curIdx;
+        return {label: r[B.col] + (future ? ' *' : ''), value: R.num(B.get(r,'RETENTION RATE')), tone: future ? 'n' : '', text: R.fmtPct(R.num(B.get(r,'RETENTION RATE'))), sub: `${R.fmt(R.num(B.get(r,'Paid')),0)}/${R.fmt(R.num(B.get(r,'Cohort')),0)}`};
+      }), {max: 100})}
+      ${curIdx >= 0 && curIdx < rows.length-1 ? '<p class="note">* Cohort bulan mendatang wajar masih rendah karena murid belum masuk window follow-up.</p>' : ''}</div>`;
+  }
+  if (D){
+    const rows = D.rows.map(r => ({label: r[D.col], n: R.num(D.get(r,'Count')), p: R.num(D.get(r,'% of Churn'))})).filter(x => x.n > 0).sort((a,b) => b.n - a.n);
+    html += `<div class="sec-head"><h2>Alasan churn · semua center</h2><span class="note" style="margin:0">Cohort ${esc(month)}</span></div>
+      <div class="card">${rows.length ? R.bars(rows.map(x => ({label:x.label, value:x.n, tone:'r', text:R.fmt(x.n,0), sub:R.fmtPct(x.p,0)}))) : '<p class="note">Belum ada alasan churn tercatat.</p>'}</div>`;
+  }
+  return html;
+}
+})();
+</script>
+</body>
+</html>

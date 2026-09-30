@@ -6,14 +6,21 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | Kategori | Sub-menu | Folder | Sumber data |
 |---|---|---|---|
 | **Center** | Rekap Acquisition (harian / mingguan / bulanan) | `center/` | Feed Rekap Harian, Feed Rekap Bulanan, Feed Rekap Mingguan Area |
-| | Retention, Cash & Piutang | segera | Feed Dashboard Tambahan (tab 03, 12) |
+| | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
+| | Cash & Piutang (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
-| | Retention, PIP | segera | Feed Dashboard Tambahan (tab 03, 05) |
+| | Retention per SA Retention (SAR) | `sa/retention/` | Feed Dashboard Tambahan (tab 03) |
+| | PIP (band & status PIP / Watch / OK per advisor) | `sa/pip/` | Feed Dashboard Tambahan (tab 05) |
 | **Kelas** | Slot Map | `kelas/` | Feed Slot Map (Reguler Class Availability) |
-| | Utilisasi, Coach | segera | Feed Dashboard Tambahan (tab 08, 11) |
+| | Utilisasi per age group & hari, headroom, kelas trial | `kelas/utilisasi/` | Feed Dashboard Tambahan (tab 08) |
+| | Coach (beban murid, sesi per hari, level murid) | `kelas/coach/` | Feed Dashboard Tambahan (tab 11, dan tabel G tab 08) |
 
 - `assets/shell.js` + `assets/shell.css`: menu kategori & sub-menu (daftar di `NAV`), filter center bersama,
-  dan utilitas baca Sheet (`DA.fetchPublicCsv`, `DA.parseCSV`, `DA.sheetNum`). Sub-menu baru: tambah folder,
+  dan utilitas baca Sheet (`DA.fetchPublicCsv`, `DA.parseCSV`, `DA.sheetNum`).
+- `assets/report.js` + `assets/report.css`: dipakai keenam sub-menu yang membaca **Feed Dashboard Tambahan**.
+  Feed itu memuat beberapa tab Exboard berdampingan; baris 1 berisi penanda `##<nama tab>` di kolom awal tiap tab.
+  Tabel dicari lewat judulnya ("A. …", "B. …") dan kolom lewat nama header, jadi menggeser baris di Exboard aman
+  selama judul dan nama header tidak diubah. Sub-menu baru: tambah folder,
   muat `../assets/shell.js`, panggil `DA.mountNav('<id>')`, lalu isi `href` di `NAV`.
 - `index.html` langsung membuka halaman terakhir yang dilihat. `rekap/` dan `slot-map/` hanya mengalihkan
   ke `center/` dan `kelas/` (alamat lama).
@@ -50,4 +57,7 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   harian, mingguan dan bulanan semuanya dihitung dari tabel itu (Acquisition = FP SD, Revenue dari Revenue Record).
   Sebelum itu: mingguan dari feed mingguan (Acquisition = Paid DP + Paid Full), bulanan dari tab 02 Acquisition
   (hanya Reporting Month yang sedang dipilih di Exboard). Target bulan/minggu berjalan dipro-rata sampai hari ini.
+- SA Retention: tab 03 belum mencatat center tiap SAR, jadi halaman itu selalu menampilkan semua center.
+- Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
+  sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.

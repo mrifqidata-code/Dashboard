@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PIP Advisor</title>
+<meta name="description" content="Band performa dan status PIP / Watch per advisor.">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../assets/shell.css">
+<link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body class="cat-sa">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M16 11l2 2 3.5-4"/></svg></div>
+    <div class="brand">
+      <h1>PIP</h1>
+      <p id="sub">Student Advisor</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('sa-pip');
+let center = DA.center.get();
+const view = R.start({render, foot: 'Band SU→Paid = (DP+FP) ÷ Show Up. Band DP→FP = Full Payment ÷ (DP+FP). PIP = 2 bulan berturut-turut P3 di CVR SU→Paid. Watch = P3 di salah satu band bulan ini.'});
+const ORDER = {PIP:0, Watch:1, OK:2};
+const bandTone = b => b==='P1' ? 'g' : b==='P3' ? 'r' : b==='P2' ? 'y' : '';
+const statTone = s => s==='PIP' ? 'r' : s==='Watch' ? 'y' : s==='OK' ? 'g' : '';
+
+function dist(t, label){
+  if (!t) return '';
+  const n = b => t.val(b, center) || 0, all = n('P1') + n('P2') + n('P3');
+  const col = {P1:'var(--good)', P2:'var(--warn)', P3:'var(--crit)'};
+  return `<div class="card"><h3>${esc(label)}</h3>
+    <div class="stack">${['P1','P2','P3'].map(b => `<i style="width:${all ? n(b)/all*100 : 0}%;background:${col[b]}" title="${b}: ${n(b)}"></i>`).join('')}</div>
+    <div class="legend">${['P1','P2','P3'].map(b => `<span><i style="background:${col[b]}"></i>${b} · ${R.fmt(n(b),0)} SA</span>`).join('')}</div></div>`;
+}
+
+function render(secs){
+  const sec = secs['05 PIP'];
+  const A = R.table(sec, /^A\. DISTRIBUSI BAND/i), B = R.table(sec, /^B\. DISTRIBUSI BAND/i), C = R.table(sec, /^C\. ADVISOR SCORECARD/i);
+  if (!C) return R.empty('Scorecard belum terbaca', 'Bagian "C. Advisor scorecard" tidak ditemukan di tab 05 PIP.');
+  const all = C.rows.filter(r => r[C.col] && C.get(r, 'Branch'));
+  const present = DA.CENTERS.filter(c => all.some(r => C.get(r, 'Branch')===c));
+  center = DA.centerChips($('#cChips'), present, c => { center = c; view.redraw(); });
+  const month = R.monthOf(sec);
+  $('#sub').textContent = `Student Advisor · ${month}${center==='ALL' ? '' : ' · ' + center}`;
+  const rows = all.filter(r => center==='ALL' || C.get(r, 'Branch')===center)
+    .sort((a, b) => (ORDER[C.get(a,'STATUS')] ?? 3) - (ORDER[C.get(b,'STATUS')] ?? 3) || (R.num(C.get(a,'Blended Score')) || 0) - (R.num(C.get(b,'Blended Score')) || 0));
+  const cnt = s => rows.filter(r => C.get(r,'STATUS')===s).length;
+  let html = `<div class="kpis">
+    ${R.kpi('PIP', R.fmt(cnt('PIP'),0), '2 bulan berturut-turut P3', cnt('PIP') ? 'r' : 'g')}
+    ${R.kpi('Watch', R.fmt(cnt('Watch'),0), 'P3 di salah satu band', cnt('Watch') ? 'y' : 'g')}
+    ${R.kpi('OK', R.fmt(cnt('OK'),0), 'tidak ada band P3', 'g')}
+    ${R.kpi('Advisor', R.fmt(rows.length,0), center==='ALL' ? 'semua center' : esc(center))}
+  </div>`;
+  html += `<div class="sec-head"><h2>Distribusi band</h2></div><div class="grid2">${dist(A, 'CVR Show Up → Paid')}${dist(B, 'CVR DP → FP')}</div>`;
+  if (!rows.length) return html + R.empty('Belum ada advisor', `Belum ada data advisor untuk ${esc(center)} bulan ini.`);
+  const met = (label, cvr, band) => `<div class="met"><div class="ml">${label}</div><div class="mv">${R.fmtPct(R.num(cvr),0)} ${band && band!=='-' ? `<span class="chip ${bandTone(band)}">${esc(band)}</span>` : ''}</div></div>`;
+  html += `<div class="sec-head"><h2>Scorecard advisor</h2><span class="note" style="margin:0">Urut: PIP → Watch → OK</span></div>
+    <div class="list">${rows.map(r => {
+      const st = C.get(r,'STATUS');
+      return `<div class="item ${st==='PIP' ? 'r' : st==='Watch' ? 'y' : ''}">
+        <div class="item-top"><span class="item-name">${esc(r[C.col])}</span>${center==='ALL' ? `<span class="chip">${esc(C.get(r,'Branch'))}</span>` : ''}
+          <span class="item-sub"><span class="chip ${statTone(st)}">${esc(st || '—')}</span></span></div>
+        <div class="mets">
+          ${met('SU → Paid', C.get(r,'CVR SU→Paid'), C.get(r,'Band SU→Paid'))}
+          ${met('DP → FP', C.get(r,'CVR DP→FP'), C.get(r,'Band DP→FP'))}
+          ${met('SU bln lalu', C.get(r,'CVR SU Bln Lalu'), C.get(r,'Band Bln Lalu'))}
+          <div class="met"><div class="ml">Blended</div><div class="mv">${esc(C.get(r,'Blended Score') || '—')} ${C.get(r,'Blended Band') && C.get(r,'Blended Band')!=='-' ? `<span class="chip ${bandTone(C.get(r,'Blended Band'))}">${esc(C.get(r,'Blended Band'))}</span>` : ''}</div></div>
+        </div>
+        <p class="note" style="margin-top:6px">Show up ${R.fmt(R.num(C.get(r,'Show Up')),0)} · paid DP ${R.fmt(R.num(C.get(r,'Paid DP')),0)} · paid full ${R.fmt(R.num(C.get(r,'Paid Full')),0)}</p>
+      </div>`;
+    }).join('')}</div>`;
+  return html;
+}
+})();
+</script>
+</body>
+</html>

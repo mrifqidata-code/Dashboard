@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Retention SA</title>
+<meta name="description" content="Retention rate per SA Retention (SAR): cohort, paid, churn.">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../assets/shell.css">
+<link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body class="cat-sa">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M16 11l2 2 3.5-4"/></svg></div>
+    <div class="brand">
+      <h1>Retention SA</h1>
+      <p id="sub">Student Advisor</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('sa-retention');
+const view = R.start({render, foot: 'Cohort = murid yang Last Class Date-nya jatuh di bulan tersebut dan dipegang SA Retention (SAR) itu. Kalau kolom Last Class Date kosong, murid tidak masuk cohort mana pun.'});
+const tone = (v, ref) => v==null || ref==null ? '' : v >= ref ? 'g' : v < ref*0.8 ? 'r' : 'y';
+
+function render(secs){
+  // Tab 03 belum mencatat center tiap SAR, jadi halaman ini selalu untuk semua center
+  $('#cChips').innerHTML = '<p class="note" style="margin:0">SA Retention melayani lintas center; tab 03 Retention belum mencatat center tiap SAR, jadi daftar ini untuk semua center.</p>';
+  const sec = secs['03 Retention'];
+  const C = R.table(sec, /^C\. COHORT BULAN BERJALAN/i);
+  if (!C) return R.empty('Tabel SAR belum terbaca', 'Bagian "C. Cohort bulan berjalan — per SA Retention" tidak ditemukan di tab 03 Retention.');
+  const month = R.monthOf(sec);
+  $('#sub').textContent = `Student Advisor · cohort ${month}`;
+  const v = (r, n) => r ? R.num(C.get(r, n)) : null;
+  const tot = C.row('TOTAL');
+  const named = C.rows.filter(r => r[C.col] && r[C.col] !== '-' && !/^total$/i.test(r[C.col]));
+  const sar = named.filter(r => v(r, 'Cohort') > 0), idle = named.filter(r => !(v(r, 'Cohort') > 0)).map(r => r[C.col]);
+  const totRR = v(tot, 'RETENTION RATE');
+  let html = `<div class="kpis">
+    ${R.kpi('Retention rate', R.fmtPct(totRR), `${R.fmt(v(tot,'Paid'),0)} dari ${R.fmt(v(tot,'Cohort'),0)} murid`)}
+    ${R.kpi('Churn rate', R.fmtPct(v(tot,'Churn Rate')), `${R.fmt(v(tot,'Churn'),0)} murid churn`)}
+    ${R.kpi('SAR aktif', R.fmt(sar.length,0), 'punya cohort bulan ini')}
+    ${R.kpi('Coverage', R.fmtPct(v(tot,'Coverage %')), 'sudah dihubungi')}
+  </div>`;
+  if (!sar.length) return html + R.empty('Belum ada cohort SAR', `Belum ada murid yang Last Class Date-nya jatuh di ${esc(month)}.`);
+  sar.sort((a, b) => (v(b,'RETENTION RATE') || 0) - (v(a,'RETENTION RATE') || 0) || v(b,'Cohort') - v(a,'Cohort'));
+  html += `<div class="sec-head"><h2>Per SA Retention</h2><span class="note" style="margin:0">Hijau ≥ rata-rata (${R.fmtPct(totRR)}), merah bila 20% di bawahnya</span></div>
+    <div class="list">${sar.map(r => {
+      const rr = v(r,'RETENTION RATE'), t = tone(rr, totRR), open = ['Confirm to retain','Potential Renew','Still Unsure','Asked — no response','Potential Churn','Not yet asked','Belum ada status'].reduce((a, k) => a + (v(r,k) || 0), 0);
+      return `<div class="item ${t==='r' ? 'r' : ''}">
+        <div class="item-top"><span class="item-name">${esc(r[C.col])}</span><span class="item-sub"><span class="chip ${t}">${R.fmtPct(rr)}</span></span></div>
+        <div class="mets">
+          <div class="met"><div class="ml">Cohort</div><div class="mv">${R.fmt(v(r,'Cohort'),0)}</div></div>
+          <div class="met"><div class="ml">Paid</div><div class="mv">${R.fmt(v(r,'Paid'),0)}</div></div>
+          <div class="met"><div class="ml">Churn</div><div class="mv">${R.fmt(v(r,'Churn'),0)} <small>${R.fmtPct(v(r,'Churn Rate'),0)}</small></div></div>
+          <div class="met"><div class="ml">Belum final</div><div class="mv">${R.fmt(open,0)}</div></div>
+        </div></div>`;
+    }).join('')}</div>`;
+  if (idle.length) html += `<p class="note">Belum ada cohort bulan ini: ${esc(idle.join(', '))}.</p>`;
+  return html;
+}
+})();
+</script>
+</body>
+</html>

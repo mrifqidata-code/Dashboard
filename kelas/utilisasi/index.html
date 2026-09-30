@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Utilisasi Kelas</title>
+<meta name="description" content="Utilisasi kelas reguler per age group dan hari, headroom, dan kelas trial.">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../assets/shell.css">
+<link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body class="cat-kelas">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 4v16M16 4v16"/></svg></div>
+    <div class="brand">
+      <h1>Utilisasi</h1>
+      <p id="sub">Kelas</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('kelas-utilisasi');
+let center = DA.center.get();
+const view = R.start({render, foot: 'Utilisasi = kursi terpakai ÷ kapasitas kursi kelas reguler. Potensi revenue = headroom kursi × ARPU di Settings Exboard (plafon teoretis, bukan forecast).'});
+const AGES = ['Baby','Tiny','Little','Kids'], DAYS = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+
+function render(secs){
+  center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
+  const sec = secs['08 Class Utilization'];
+  const A = R.table(sec, /^A\. RINGKASAN KAPASITAS/i), B = R.table(sec, /^B\. HEADROOM/i), C = R.table(sec, /^C\. UTILISASI PER AGE/i),
+        D = R.table(sec, /^D\. UTILISASI PER HARI/i), E = R.table(sec, /^E\. UTILISASI KELAS TRIAL/i);
+  if (!A) return R.empty('Tabel utilisasi belum terbaca', 'Bagian "A. Ringkasan kapasitas kelas reguler" tidak ditemukan di tab 08 Class Utilization.');
+  const month = R.monthOf(sec), c = center;
+  $('#sub').textContent = `Kelas · ${month}${c==='ALL' ? '' : ' · ' + c}`;
+  const val = (t, m, x) => t ? t.val(m, x || c) : null;
+  const target = val(B, /^Target Utilization/i) || 90;
+  const tone = v => v==null ? '' : v >= target ? 'g' : v < 30 ? 'r' : 'y';
+  const util = val(A, /^UTILIZATION/i), used = val(A, /^Kursi terpakai/i), cap = val(A, /^Total kapasitas kursi/i);
+  const k1000 = v => v==null ? null : v * 1000;   // potensi revenue di Exboard dalam ribuan rupiah
+  let html = `<div class="kpis">
+    ${R.kpi('Utilisasi kelas reguler', R.fmtPct(util), `target ${R.fmtPct(target,0)}`, tone(util))}
+    ${R.kpi('Kursi terpakai', R.fmt(used,0), `dari ${R.fmt(cap,0)} kursi`)}
+    ${R.kpi('Headroom ke target', R.fmt(val(B, /^Headroom ke target/i),0), 'kursi lagi')}
+    ${R.kpi('Potensi revenue', R.fmtRp(k1000(val(B, /^Potensi revenue ke target/i))), 'bila utilisasi capai target')}
+  </div>`;
+  html += `<div class="grid2" style="margin-top:12px">
+    ${C ? `<div class="card"><h3>Per age group</h3>${R.bars(AGES.map(a => { const v = val(C, a); return {label: a, value: v, tone: tone(v), text: R.fmtPct(v)}; }), {max: 100, mark: target})}</div>` : ''}
+    ${D ? `<div class="card"><h3>Per hari</h3>${R.bars(DAYS.map(d => { const v = val(D, d); return {label: d, value: v, tone: tone(v), text: R.fmtPct(v)}; }), {max: 100, mark: target})}</div>` : ''}
+  </div><p class="note">Garis tipis = target utilisasi ${R.fmtPct(target,0)}. Hijau ≥ target, merah di bawah 30%.</p>`;
+  html += `<div class="sec-head"><h2>Slot</h2></div><div class="kpis">
+    ${R.kpi('Slot kelas', R.fmt(val(A, /^Jumlah slot kelas/i),0), `${R.fmt(val(A, /^Slot AVAILABLE/i),0)} masih available`)}
+    ${R.kpi('Slot masih kosong', R.fmt(val(A, /^Slot masih kosong/i),0), 'belum ada murid sama sekali')}
+    ${R.kpi('Murid aktif', R.fmt(val(A, /^Murid aktif/i),0), 'Student Management')}
+    ${R.kpi('Kursi kosong', R.fmt(val(A, /^Kursi kosong/i),0), `penuh: +${R.fmtRp(k1000(val(B, /^Potensi revenue kapasitas penuh/i)))}`)}
+  </div>`;
+  if (E){
+    const f = [['Kapasitas trial', /^Kapasitas trial/i], ['Booking', /^# Booking/i], ['Confirmed', /^# Confirmed/i], ['Show up', /^# Show Up/i], ['Paid', /^# Total Paid/i]]
+      .map(([label, re]) => ({label, value: val(E, re)}));
+    html += `<div class="sec-head"><h2>Kelas trial · ${esc(month)}</h2></div><div class="kpis">
+      ${R.kpi('Booking fill rate', R.fmtPct(val(E, /^Booking Fill Rate/i)), 'booking ÷ kapasitas')}
+      ${R.kpi('Show up rate', R.fmtPct(val(E, /^Show Up Rate/i)), 'show up ÷ booking')}
+      ${R.kpi('Trial → paid', R.fmtPct(val(E, /^Trial → Paid/i)), 'paid ÷ show up')}
+      ${R.kpi('Kursi trial terbuang', R.fmt(val(E, /^Kursi trial terbuang/i),0), `${R.fmt(val(E, /^Jumlah sesi trial/i),0)} sesi trial`)}
+    </div><div class="card" style="margin-top:12px">${R.bars(f.map((x, i) => ({...x, tone: i===4 ? 'g' : '', text: R.fmt(x.value,0)})), {max: f[0].value})}</div>`;
+  }
+  if (c==='ALL'){
+    const cols = DA.CENTERS.concat(['ALL']);
+    const pct = (t, m, x) => { const v = val(t, m, x); return {txt: R.fmtPct(v), tone: tone(v)}; };
+    const row = (x, list) => { const cells = list.map(fn => fn(x)); return {cls: x==='ALL' ? 'tot' : '', cells: [x==='ALL' ? 'TOTAL' : x].concat(cells.map(y => y.txt)), tones: [''].concat(cells.map(y => y.tone))}; };
+    html += `<div class="sec-head"><h2>Per center · age group</h2></div>` + R.tbl(['Center','Total'].concat(AGES),
+      cols.map(x => row(x, [y => pct(A, /^UTILIZATION/i, y)].concat(AGES.map(a => y => pct(C, a, y))))));
+    html += `<div class="sec-head"><h2>Per center · hari</h2></div>` + R.tbl(['Center'].concat(DAYS.map(d => d.slice(0,3))),
+      cols.map(x => row(x, DAYS.map(d => y => pct(D, d, y)))));
+  }
+  return html;
+}
+})();
+</script>
+</body>
+</html>

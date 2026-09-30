@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cash & Piutang</title>
+<meta name="description" content="Penerimaan, piutang, dan status cash bertahap per center.">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../assets/shell.css">
+<link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body class="cat-center">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+    <div class="brand">
+      <h1>Cash & Piutang</h1>
+      <p id="sub">Center</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('center-cash');
+let center = DA.center.get();
+const view = R.start({render, foot: 'Piutang dan status cash bertahap adalah akumulasi seluruh histori, bukan hanya bulan berjalan. Detail per murid ada di sheet CB Tracker Exboard.'});
+
+function render(secs){
+  center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
+  const sec = secs['12 Cash & Piutang'];
+  const A = R.table(sec, /^A\. KOMPOSISI PENERIMAAN/i), B = R.table(sec, /^B\. PIUTANG/i), C = R.table(sec, /^C\. CASH BERTAHAP/i),
+        D = R.table(sec, /^D\. METODE PEMBAYARAN/i), E = R.table(sec, /^E\. BUNDLING/i), F = R.table(sec, /^F\. PORSI CASH BERTAHAP/i),
+        G = R.table(sec, /^G\. STATUS CASH BERTAHAP/i);
+  if (!A) return R.empty('Tabel cash belum terbaca', 'Bagian "A. Komposisi penerimaan" tidak ditemukan di tab 12 Cash & Piutang.');
+  const month = R.monthOf(sec), c = center, scope = c==='ALL' ? 'semua center' : c;
+  $('#sub').textContent = `Periode ${month}${c==='ALL' ? '' : ' · ' + c}`;
+  const val = (t, m) => t ? t.val(m, c) : null;
+  const total = val(A, 'TOTAL PENERIMAAN');
+  const bad = val(G, /^% Bermasalah/i), aktif = val(G, /^Masih aktif/i), sisa = val(G, /^Sisa tagihan/i);
+  let html = `<div class="kpis">
+    ${R.kpi('Penerimaan bulan ini', R.fmtRp(total), esc(scope))}
+    ${R.kpi('Piutang', R.fmtRp(val(B, /^Total piutang/i)), `${R.fmt(val(B, /^Jumlah murid belum lunas/i),0)} murid belum lunas`)}
+    ${R.kpi('Cash bertahap aktif', R.fmt(aktif,0), sisa!=null ? `sisa tagihan ${R.fmtRp(Math.abs(sisa))}` : '')}
+    ${R.kpi('Cash bertahap bermasalah', R.fmtPct(bad), 'telat + warning + default', bad==null ? '' : bad > 30 ? 'r' : bad > 15 ? 'y' : 'g')}
+  </div>`;
+
+  const comp = ['DP','DP + Member Fee','Member Fee','Cash Bertahap: Akad','Cash Bertahap: Cicilan','Cash Bertahap: Pelunasan','Freeze Class']
+    .map(m => ({label: m.replace('Cash Bertahap: ','CB: '), value: val(A, m) || 0})).filter(x => x.value > 0);
+  html += `<div class="sec-head"><h2>Komposisi penerimaan · ${esc(month)}</h2></div>
+    <div class="card">${R.bars(comp.map(x => ({...x, text: R.fmtRp(x.value), sub: total ? R.fmtPct(x.value/total*100,0) : ''})))}</div>`;
+
+  if (G){
+    const steps = [[/^LUNAS$/i,'Lunas','g'],[/On Track/i,'On track (≤30 hari)',''],[/TELAT/i,'Telat (31–60 hari)','y'],[/WARNING/i,'Warning (61–90 hari)','y'],[/DEFAULT/i,'Default (>90 hari)','r']]
+      .map(([re, label, tone]) => ({label, tone, value: val(G, re) || 0}));
+    const all = val(G, /^Total murid pakai cash bertahap/i) || steps.reduce((a, x) => a + x.value, 0);
+    const colors = {g:'var(--good)', '':'var(--accent)', y:'var(--warn)', r:'var(--crit)'};
+    html += `<div class="sec-head"><h2>Cash bertahap · seluruh periode</h2><span class="note" style="margin:0">${R.fmt(all,0)} murid</span></div>
+      <div class="grid2"><div class="card"><div class="stack">${steps.map(x => `<i style="width:${all ? x.value/all*100 : 0}%;background:${colors[x.tone]}" title="${esc(x.label)}"></i>`).join('')}</div>
+        <div style="margin-top:12px">${R.bars(steps.map(x => ({...x, text:R.fmt(x.value,0), sub: all ? R.fmtPct(x.value/all*100,0) : ''})), {max: all})}</div></div>
+      <div class="card"><h3>Nilai</h3>${R.bars([
+        {label:'Nilai akad', value: val(G, /^Nilai akad kumulatif/i)},
+        {label:'Sudah dibayar', value: val(G, /^Sudah dibayar/i), tone:'g'},
+        {label:'Sisa tagihan', value: sisa==null ? null : Math.abs(sisa), tone:'y'}].map(x => ({...x, text: R.fmtRp(x.value)})))}
+        ${C ? `<h3 style="margin-top:16px">Bulan ini</h3>${R.bars([
+          {label:'Akad baru', value: val(C, /^Akad/i), text: R.fmt(val(C, /^Akad/i),0) + ' murid'},
+          {label:'Cicilan diterima', value: val(C, /^Cicilan diterima/i), text: R.fmt(val(C, /^Cicilan diterima/i),0) + ' murid'},
+          {label:'Pelunasan', value: val(C, /^Pelunasan/i), tone:'g', text: R.fmt(val(C, /^Pelunasan/i),0) + ' murid'},
+          {label:'DP belum FP', value: val(C, /^Murid berstatus DP/i), tone:'y', text: R.fmt(val(C, /^Murid berstatus DP/i),0) + ' murid'}])}` : ''}
+      </div></div>`;
+  }
+  if (F){
+    const pa = val(F, /^% AKAD DARI TOTAL AKUISISI/i);
+    html += `<div class="sec-head"><h2>Porsi cash bertahap bulan ini</h2></div><div class="kpis">
+      ${R.kpi('Akad dari akuisisi', R.fmtPct(pa), `${R.fmt(val(F, /^Akad cash bertahap/i),0)} dari ${R.fmt(val(F, /^Total akuisisi/i),0)} murid baru`, pa==null ? '' : pa > 30 ? 'r' : 'g')}
+      ${R.kpi('Akad dari penerimaan', R.fmtPct(val(F, /^% Akad dari penerimaan/i)), `nilai akad ${R.fmtRp(val(F, /^Nilai akad diterima/i))}`)}
+    </div><p class="note">Porsi akad tinggi = revenue diakui sekarang, kasnya masuk belakangan. Merah bila lebih dari 30%.</p>`;
+  }
+  if (D){
+    const pay = D.rows.map(r => ({label: r[D.col], value: val(D, r[D.col]) || 0})).filter(x => x.value > 0).sort((a,b) => b.value - a.value);
+    html += `<div class="sec-head"><h2>Metode pembayaran · ${esc(month)}</h2></div><div class="card">${R.bars(pay.map(x => ({...x, text: R.fmtRp(x.value)})))}</div>`;
+  }
+  if (E){
+    const bx = E.rows.map(r => ({label: r[E.col], value: val(E, r[E.col]) || 0})).filter(x => x.value > 0);
+    if (bx.length) html += `<div class="sec-head"><h2>Bundling & crosspol · ${esc(month)}</h2></div><div class="card">${R.bars(bx.map(x => ({...x, text: R.fmtRp(x.value)})))}</div>`;
+  }
+  if (c==='ALL'){
+    const cols = DA.CENTERS.concat(['ALL']);
+    html += `<div class="sec-head"><h2>Per center</h2></div>` + R.tbl(['Center','Penerimaan','Piutang','Murid belum lunas','CB bermasalah'],
+      cols.map(x => ({cls: x==='ALL' ? 'tot' : '', cells:[x==='ALL' ? 'TOTAL' : x, R.fmtRp(A.val('TOTAL PENERIMAAN', x)), R.fmtRp(B && B.val(/^Total piutang/i, x)),
+        R.fmt(B && B.val(/^Jumlah murid belum lunas/i, x),0), R.fmtPct(G && G.val(/^% Bermasalah/i, x))]})));
+  }
+  return html;
+}
+})();
+</script>
+</body>
+</html>

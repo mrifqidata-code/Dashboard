@@ -13,16 +13,16 @@ const ICON = {
 const NAV = [
   {id:'center', label:'Center', subs:[
     {id:'center', label:'Rekap Acquisition', href:'center/'},
-    {id:'center-retention', label:'Retention'},
-    {id:'center-cash', label:'Cash & Piutang'}]},
+    {id:'center-retention', label:'Retention', href:'center/retention/'},
+    {id:'center-cash', label:'Cash & Piutang', href:'center/cash/'}]},
   {id:'sa', label:'Student Advisor', short:'SA', subs:[
     {id:'sa', label:'Acquisition', href:'sa/'},
-    {id:'sa-retention', label:'Retention'},
-    {id:'sa-pip', label:'PIP'}]},
+    {id:'sa-retention', label:'Retention', href:'sa/retention/'},
+    {id:'sa-pip', label:'PIP', href:'sa/pip/'}]},
   {id:'kelas', label:'Kelas', subs:[
     {id:'kelas', label:'Slot Map', href:'kelas/'},
-    {id:'kelas-utilisasi', label:'Utilisasi'},
-    {id:'kelas-coach', label:'Coach'}]}
+    {id:'kelas-utilisasi', label:'Utilisasi', href:'kelas/utilisasi/'},
+    {id:'kelas-coach', label:'Coach', href:'kelas/coach/'}]}
 ];
 
 /* ---------- Utilitas ---------- */
