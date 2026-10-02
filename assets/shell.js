@@ -105,6 +105,29 @@ function centerChips(el, list, onChange, opts){
   return sel;
 }
 
+/* ---------- Font (uji coba) ---------- */
+// Pilihan font diingat di perangkat ini. Default Poppins; Plus Jakarta Sans dimuat hanya bila dipilih.
+const FONT_KEY = 'dashboardApp.font';
+const FONTS = {
+  poppins: {label:'Poppins'},
+  jakarta: {label:'Plus Jakarta Sans', family:'"Plus Jakarta Sans"', css:'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap'}
+};
+const font = {
+  get(){ const f = lsGet(FONT_KEY); return FONTS[f] ? f : 'poppins'; },
+  apply(k){
+    const f = FONTS[k] || FONTS.poppins;
+    if (f.css && !document.getElementById('da-font-css')){
+      const l = document.createElement('link'); l.id = 'da-font-css'; l.rel = 'stylesheet'; l.href = f.css; document.head.appendChild(l);
+    }
+    let st = document.getElementById('da-font');
+    if (!f.family){ if (st) st.remove(); return; }
+    if (!st){ st = document.createElement('style'); st.id = 'da-font'; document.head.appendChild(st); }
+    st.textContent = `body{font-family:${f.family},system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important}`;
+  },
+  set(k){ lsSet(FONT_KEY, k); font.apply(k); }
+};
+font.apply(font.get());
+
 /* ---------- Navigasi ---------- */
 function mountNav(pageId){
   const cat = NAV.find(c => c.subs.some(s => s.id===pageId)) || NAV[0];
@@ -122,13 +145,17 @@ function mountNav(pageId){
     sub.className = 'subnav'; sub.setAttribute('aria-label', cat.label);
     sub.innerHTML = `<div class="wrap">${cat.subs.map(s => s.href
       ? `<a href="${ROOT + s.href}"${s.id===pageId ? ' aria-current="page"' : ''}>${esc(s.label)}</a>`
-      : `<span class="soon" title="Segera hadir">${esc(s.label)} <small>segera</small></span>`).join('')}</div>`;
+      : `<span class="soon" title="Segera hadir">${esc(s.label)} <small>segera</small></span>`).join('')}<button type="button" class="fontbtn" title="Ganti font (uji coba)"></button></div>`;
     header.insertAdjacentElement('afterend', sub);
+    const fb = sub.querySelector('.fontbtn');
+    const label = () => { fb.innerHTML = `<b>Aa</b> ${esc(FONTS[font.get()].label)}`; };
+    fb.addEventListener('click', () => { font.set(font.get()==='jakarta' ? 'poppins' : 'jakarta'); label(); });
+    label();
   }
   const me = cat.subs.find(s => s.id===pageId);
   if (me && me.href) { try { localStorage.setItem('dashboardApp.last', me.href); } catch(e){} }
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register(ROOT + 'sw.js').catch(() => {});
 }
 
-window.DA = {ROOT, CENTERS, NAV, esc, lsGet, lsSet, fmtTime, parseCSV, sheetNum, fetchPublicCsv, center, centerChips, mountNav};
+window.DA = {ROOT, CENTERS, NAV, esc, lsGet, lsSet, fmtTime, parseCSV, sheetNum, fetchPublicCsv, center, centerChips, mountNav, font};
 })();
