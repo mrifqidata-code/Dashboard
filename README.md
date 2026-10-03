@@ -59,7 +59,8 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   Sebelum itu: mingguan dari feed mingguan (Acquisition = Paid DP + Paid Full), bulanan dari tab 02 Acquisition
   (hanya Reporting Month yang sedang dipilih di Exboard). Target bulan/minggu berjalan dipro-rata sampai hari ini.
 - Class Trial: feed menjumlahkan sheet Class Trial (satu baris per sesi trial, tanpa data anak) per tanggal trial ×
-  center × age group, mulai awal bulan 6 bulan lalu. Periode cepat (Hari ini … Bulan lalu) dihitung ulang setiap dibuka;
+  center × age group, mulai awal bulan 6 bulan lalu. Label umur ditampilkan sebagai Baby (6-17 Mo), Tiny (18-36 Mo),
+  Little (3-5 Yo), Kids (5-8+ Yo), Star (9-12 Yo). Periode cepat (Hari ini … Bulan lalu) dihitung ulang setiap dibuka;
   tanggal bebas diingat di perangkat. Rentang ≤31 hari dirinci per hari, lebih panjang per bulan.
 - SA Retention: tab 03 belum mencatat center tiap SAR, jadi halaman itu selalu menampilkan semua center.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);

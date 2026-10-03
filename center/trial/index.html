@@ -95,6 +95,10 @@ $('#pre').addEventListener('click', e => { const b = e.target.closest('[data-p]'
 }));
 syncRange();
 
+// Label umur di sheet Class Trial → nama kelas; label lain ditampilkan apa adanya
+const AGES = [[/^6\s*-\s*17\s*mo/i, 'Baby'], [/^18\s*-\s*36\s*mo/i, 'Tiny'], [/^3\s*-\s*5\s*yo/i, 'Little'], [/^5\s*-\s*8/i, 'Kids'], [/^9\s*-\s*12\s*yo/i, 'Star']];
+const ageName = s => { if (!s) return 'Lainnya'; const m = AGES.find(([re, n]) => re.test(s) || s.toLowerCase()===n.toLowerCase()); return m ? m[1] : s; };
+
 // Feed: QUERY atas sheet Class Trial (per sesi) → satu baris per tanggal trial × center × age group
 function parse(text){
   const rows = DA.parseCSV(text), first = R.T((rows[0] || [])[0]);
@@ -110,7 +114,7 @@ function parse(text){
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d.slice(0,10))) continue;
     const c = R.T(r[1]).toUpperCase(); if (!DA.CENTERS.includes(c)) continue;
     const v = k => ix[k] >= 0 ? (R.num(r[ix[k]]) || 0) : 0;
-    out.push({d: d.slice(0,10), c, a: R.T(r[ix.a]) || 'Lainnya', bk: v('bk'), cf: v('cf'), su: v('su'), dp: v('dp'), rf: v('rf'), tp: v('tp')});
+    out.push({d: d.slice(0,10), c, a: ageName(R.T(r[ix.a])), bk: v('bk'), cf: v('cf'), su: v('su'), dp: v('dp'), rf: v('rf'), tp: v('tp')});
   }
   return out;
 }
@@ -121,13 +125,14 @@ const pct = (a, b) => b ? a / b * 100 : null;
 const cvrTone = v => v==null ? '' : v >= 45 ? 'g' : v < 35 ? 'r' : 'y';
 // Urut dari umur termuda: "6-17 Mo" < "18-36 Mo" < "3-5 Yo" < … (Mo = bulan, Yo = tahun); label lain di belakang
 const ageMonths = s => { const m = /(\d+)\D*?(mo|yo|bulan|tahun|th)?/i.exec(s); if (!m) return 1e9; return Number(m[1]) * (/^(yo|tahun|th)/i.test(m[2] || s.replace(/^[^a-z]*/i,'')) ? 12 : 1); };
-const ageSort = (a, b) => ageMonths(a) - ageMonths(b) || a.localeCompare(b);
+const AGE_ORDER = AGES.map(x => x[1]);
+const ageSort = (a, b) => (AGE_ORDER.indexOf(a) + 1 || 99) - (AGE_ORDER.indexOf(b) + 1 || 99) || ageMonths(a) - ageMonths(b) || a.localeCompare(b);
 const HEAD = ['Booking','Confirmed','Show up','Paid DP','Regis Full','Total paid','Show up rate','CVR'];
 const cells = t => [R.fmt(t.bk,0), R.fmt(t.cf,0), R.fmt(t.su,0), R.fmt(t.dp,0), R.fmt(t.rf,0), R.fmt(t.tp,0), R.fmtPct(pct(t.su, t.bk)), R.fmtPct(pct(t.tp, t.su))];
 const tones = t => ['','','','','','','', cvrTone(pct(t.tp, t.su))];   // warna hanya di kolom CVR
 const line = (label, t, cls) => ({cls: cls || '', cells: [label].concat(cells(t)), tones: [''].concat(tones(t))});
 
-const view = R.start({feed: FEED, parse, render, foot: 'Tanggal = tanggal kelas trial (Trial Date di sheet Class Trial). Paid DP = # Regis, Regis Full = # Regis + Full. Show up rate = show up ÷ booking, CVR = total paid ÷ show up.'});
+const view = R.start({feed: FEED, parse, render, foot: 'Tanggal = tanggal kelas trial (Trial Date di sheet Class Trial). Age group: Baby 6–17 bln, Tiny 18–36 bln, Little 3–5 th, Kids 5–8+ th, Star 9–12 th. Paid DP = # Regis, Regis Full = # Regis + Full. Show up rate = show up ÷ booking, CVR = total paid ÷ show up.'});
 
 function render(all){
   center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
