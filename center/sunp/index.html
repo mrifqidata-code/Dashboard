@@ -59,8 +59,9 @@ const NONE = '(belum diisi)';
 // Feed: tab "Feed SUNP" di Exboard = QUERY atas Register Trial, hanya anak yang show up, dijumlah per
 // tanggal × center × age group × jenis bayar × potential × alasan. Tanpa nama / nomor HP.
 // Paid sama dengan Rekap: "Regis Fee only" = DP, "Regis + Member Fee" / "Member Fee" = Full, selain itu belum bayar (SUNP).
+// Salah ketik yang ada di data ("Regist Fee Only", "Regist Fee + Member Fee") disamakan dengan "Regis …".
 function payOf(s){
-  s = R.T(s).toLowerCase();
+  s = R.T(s).toLowerCase().replace(/^regist\b/, 'regis').replace(/regis fee \+ member/, 'regis + member');
   if (s==='regis fee only') return 'dp';
   if (s==='regis + member fee' || s==='member fee') return 'full';
   return 'none';
