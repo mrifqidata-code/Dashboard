@@ -119,8 +119,9 @@ const KEYS = ['bk','cf','su','dp','rf','tp'];
 const sum = list => { const t = {bk:0, cf:0, su:0, dp:0, rf:0, tp:0}; list.forEach(x => KEYS.forEach(k => t[k] += x[k])); return t; };
 const pct = (a, b) => b ? a / b * 100 : null;
 const cvrTone = v => v==null ? '' : v >= 45 ? 'g' : v < 35 ? 'r' : 'y';
-const AGE_ORDER = ['Baby','Tiny','Little','Kids'];
-const ageSort = (a, b) => (AGE_ORDER.indexOf(a) + 1 || 99) - (AGE_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b);
+// Urut dari umur termuda: "6-17 Mo" < "18-36 Mo" < "3-5 Yo" < … (Mo = bulan, Yo = tahun); label lain di belakang
+const ageMonths = s => { const m = /(\d+)\D*?(mo|yo|bulan|tahun|th)?/i.exec(s); if (!m) return 1e9; return Number(m[1]) * (/^(yo|tahun|th)/i.test(m[2] || s.replace(/^[^a-z]*/i,'')) ? 12 : 1); };
+const ageSort = (a, b) => ageMonths(a) - ageMonths(b) || a.localeCompare(b);
 const HEAD = ['Booking','Confirmed','Show up','Paid DP','Regis Full','Total paid','Show up rate','CVR'];
 const cells = t => [R.fmt(t.bk,0), R.fmt(t.cf,0), R.fmt(t.su,0), R.fmt(t.dp,0), R.fmt(t.rf,0), R.fmt(t.tp,0), R.fmtPct(pct(t.su, t.bk)), R.fmtPct(pct(t.tp, t.su))];
 const tones = t => ['','','','','','','', cvrTone(pct(t.tp, t.su))];   // warna hanya di kolom CVR
