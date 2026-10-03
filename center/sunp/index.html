@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SUNP</title>
+<meta name="description" content="Show Up Not Paid: anak yang sudah show up trial tapi belum bayar, per center, age group dan alasan.">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../assets/shell.css">
+<link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body class="cat-center">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+    <div class="brand">
+      <h1>SUNP</h1>
+      <p id="sub">Center</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('center-sunp');
+const FEED = {id:'1BODsslQUuDqtqQ2UFgCJeRYs8x_gTrMqRum8KXBH1rI', name:'Feed SUNP (dari Exboard)', cache:'dashboardApp.sunp.v1'};
+const AGE_KEY = 'dashboardApp.sunpAge';
+const P = R.period('dashboardApp.sunpRange', () => view.redraw());
+$('#cChips').insertAdjacentHTML('afterend', '<div class="cbar" id="aChips"></div>');
+let center = DA.center.get(), age = 'ALL';
+const NONE = '(belum diisi)';
+
+// Feed: tab "Feed SUNP" di Exboard = QUERY atas Register Trial, hanya anak yang show up, dijumlah per
+// tanggal × center × age group × jenis bayar × potential × alasan. Tanpa nama / nomor HP.
+// Paid sama dengan Rekap: "Regis Fee only" = DP, "Regis + Member Fee" / "Member Fee" = Full, selain itu belum bayar (SUNP).
+function payOf(s){
+  s = R.T(s).toLowerCase();
+  if (s==='regis fee only') return 'dp';
+  if (s==='regis + member fee' || s==='member fee') return 'full';
+  return 'none';
+}
+function parse(text){
+  const rows = DA.parseCSV(text), first = R.T((rows[0] || [])[0]);
+  if (/^#REF/i.test(first)) return 'ref';
+  const hi = rows.findIndex(r => /^tanggal$/i.test(R.T(r[0])) && /^center$/i.test(R.T(r[1])));
+  if (hi < 0) return first.startsWith('#') ? `!<b>Feed belum terisi (${esc(first)}).</b> Pastikan tab <b>Feed SUNP</b> di Exboard sudah dibuat dan rumusnya jalan, lalu buka feed-nya dan klik sel A1 → Allow access.` : '!<b>Isi feed tidak dikenali.</b> Baris judul (Tanggal, Center, Age Group, …) tidak ditemukan.';
+  const head = rows[hi].map(h => R.T(h).toLowerCase()), col = n => head.indexOf(n);
+  const ix = {a: col('age group'), pay: col('paid fee'), pot: col('potential'), rsn: col('reason'), n: col('show up')};
+  const out = [];
+  for (const r of rows.slice(hi+1)){
+    const d = R.toIso(r[0]); if (!d) continue;
+    const c = R.T(r[1]).toUpperCase(); if (!DA.CENTERS.includes(c)) continue;
+    const n = R.num(r[ix.n]) || 0; if (!n) continue;
+    out.push({d, c, a: R.ageName(r[ix.a]), pay: payOf(r[ix.pay]), pot: R.T(r[ix.pot]) || NONE, rsn: R.T(r[ix.rsn]) || NONE, n});
+  }
+  return out;
+}
+
+const sum = list => { const t = {su:0, dp:0, full:0, sunp:0, nr:0}; list.forEach(x => { t.su += x.n; if (x.pay==='dp') t.dp += x.n; else if (x.pay==='full') t.full += x.n; else { t.sunp += x.n; if (x.rsn===NONE) t.nr += x.n; } }); t.paid = t.dp + t.full; return t; };
+const pct = (a, b) => b ? a / b * 100 : null;
+const sunpTone = v => v==null ? '' : v <= 55 ? 'g' : v > 65 ? 'r' : 'y';      // kebalikan CVR hijau ≥45%, merah <35%
+const count = (list, key) => { const m = new Map(); list.forEach(x => m.set(x[key], (m.get(x[key]) || 0) + x.n)); return [...m].sort((a, b) => (a[0]===NONE) - (b[0]===NONE) || b[1] - a[1]); };
+const topReason = list => { const r = count(list.filter(x => x.pay==='none' && x.rsn !== NONE), 'rsn')[0]; return r ? `${esc(r[0])} <small class="muted">(${R.fmt(r[1],0)})</small>` : '–'; };
+const HEAD = ['Show up','Paid','SUNP','SUNP %','Alasan terbanyak'];
+const line = (label, list, cls) => { const t = sum(list), p = pct(t.sunp, t.su); return {cls: cls || '', cells: [label, R.fmt(t.su,0), R.fmt(t.paid,0), R.fmt(t.sunp,0), R.fmtPct(p), topReason(list)], tones: ['','','','', sunpTone(p), '']}; };
+
+const view = R.start({feed: FEED, parse, render, foot: 'SUNP = Show Up Not Paid: anak yang sudah show up trial (Register Trial kolom Show Up) tapi belum ada Type of Paid Fee DP / Full. Tanggal = kolom Date Register Trial, sama dengan Rekap. Alasan = kolom Reasons Not DP, Potential = kolom Potential.'});
+
+function render(all){
+  center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
+  const ages = [...new Set(all.map(x => x.a))].sort(R.ageSort);
+  age = R.ageChips($('#aChips'), ages, AGE_KEY, () => view.redraw());
+  const dates = all.map(x => x.d);
+  P.bounds(dates);
+  const inRange = all.filter(x => x.d >= P.from && x.d <= P.to);
+  const inScope = inRange.filter(x => (center==='ALL' || x.c===center) && (age==='ALL' || x.a===age));
+  const scopeLabel = [center==='ALL' ? 'Semua center' : center, age==='ALL' ? '' : age].filter(Boolean).join(' · ');
+  $('#sub').textContent = `${P.label()} · ${scopeLabel}`;
+  if (!inScope.length){
+    const s = dates.slice().sort(), span = s.length ? ` Data tersedia ${R.niceDate(s[0])} – ${R.niceDate(s[s.length-1])}.` : '';
+    return R.empty('Belum ada show up di periode ini', `Tidak ada anak show up trial ${esc(scopeLabel.toLowerCase())} pada ${esc(P.label())}.${span}`);
+  }
+  const t = sum(inScope), sp = pct(t.sunp, t.su), sunpRows = inScope.filter(x => x.pay==='none');
+  let html = `<div class="kpis">
+    ${R.kpi('SUNP', R.fmt(t.sunp,0), `${R.fmtPct(sp)} dari show up`, sunpTone(sp))}
+    ${R.kpi('Show up', R.fmt(t.su,0), esc(scopeLabel))}
+    ${R.kpi('Sudah bayar', R.fmt(t.paid,0), `DP ${R.fmt(t.dp,0)} · Full ${R.fmt(t.full,0)}`)}
+    ${R.kpi('Alasan belum diisi', R.fmt(t.nr,0), `${R.fmtPct(pct(t.nr, t.sunp),0)} dari SUNP`, t.nr ? 'y' : 'g')}
+  </div>`;
+  const reasons = count(sunpRows, 'rsn'), pots = count(sunpRows, 'pot');
+  html += `<div class="grid2" style="margin-top:12px">
+    <div class="card"><h3>Alasan belum DP</h3>${reasons.length ? R.bars(reasons.map(([k, v]) => ({label: k, value: v, tone: k===NONE ? 'n' : 'r', text: R.fmt(v,0), sub: R.fmtPct(pct(v, t.sunp),0)})), {max: t.sunp}) : '<p class="note">Tidak ada SUNP.</p>'}</div>
+    <div class="card"><h3>Potential</h3>${pots.length ? R.bars(pots.map(([k, v]) => ({label: k, value: v, tone: k===NONE ? 'n' : /hot|tinggi|high/i.test(k) ? 'g' : /cold|rendah|low/i.test(k) ? 'r' : '', text: R.fmt(v,0), sub: R.fmtPct(pct(v, t.sunp),0)})), {max: t.sunp}) : '<p class="note">Tidak ada SUNP.</p>'}</div>
+  </div><p class="note">Persen = terhadap jumlah SUNP. SUNP % hijau ≤55%, merah &gt;65% (kebalikan CVR).</p>`;
+
+  if (center==='ALL'){
+    const base = inRange.filter(x => age==='ALL' || x.a===age);
+    html += `<div class="sec-head"><h2>Per center</h2>${age==='ALL' ? '' : `<span class="note" style="margin:0">${esc(age)}</span>`}</div>` +
+      R.tbl(['Center'].concat(HEAD), DA.CENTERS.map(c => line(c, base.filter(x => x.c===c))).concat([line('TOTAL', base, 'tot')]));
+    // Alasan × center (hanya SUNP)
+    const sb = base.filter(x => x.pay==='none'), rs = count(sb, 'rsn').map(x => x[0]);
+    if (rs.length) html += `<div class="sec-head"><h2>Alasan per center</h2><span class="note" style="margin:0">jumlah SUNP</span></div>` +
+      R.tbl(['Alasan'].concat(DA.CENTERS, ['Total']), rs.map(k => {
+        const l = sb.filter(x => x.rsn===k), n = c => l.filter(x => x.c===c).reduce((a, x) => a + x.n, 0);
+        return {cells: [esc(k)].concat(DA.CENTERS.map(c => n(c) ? R.fmt(n(c),0) : '–'), [R.fmt(l.reduce((a, x) => a + x.n, 0),0)])};
+      }));
+  }
+  if (age==='ALL'){
+    const base = inRange.filter(x => center==='ALL' || x.c===center);
+    html += `<div class="sec-head"><h2>Per age group</h2><span class="note" style="margin:0">${esc(center==='ALL' ? 'Semua center' : center)}</span></div>` +
+      R.tbl(['Age group'].concat(HEAD), ages.map(a => line(esc(a), base.filter(x => x.a===a))).filter(r => r.cells[1] !== '0').concat([line('TOTAL', base, 'tot')]));
+  }
+  const byMonth = P.days() > 31, keyOf = x => byMonth ? x.d.slice(0,7) : x.d, lab = byMonth ? R.monthLabel : R.dayLabel;
+  const keys = [...new Set(inScope.map(keyOf))].sort().reverse();
+  html += `<div class="sec-head"><h2>${byMonth ? 'Per bulan' : 'Per hari'}</h2><span class="note" style="margin:0">${esc(scopeLabel)}</span></div>` +
+    R.tbl([byMonth ? 'Bulan' : 'Tanggal'].concat(HEAD), keys.map(k => line(lab(k), inScope.filter(x => keyOf(x)===k))).concat([line('TOTAL', inScope, 'tot')]));
+  return html;
+}
+})();
+</script>
+</body>
+</html>

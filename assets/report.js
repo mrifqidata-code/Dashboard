@@ -89,6 +89,85 @@ function tbl(head, rows, opts){
 }
 const empty = (title, text) => `<div class="empty-state"><h2>${esc(title)}</h2><p>${text}</p></div>`;
 
+/* ---------- Periode & age group (Class Trial, SUNP) ---------- */
+const MON = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const pad2 = n => String(n).padStart(2, '0');
+const isoDate = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return isoDate(d); };
+const niceDate = s => { const [y, m, d] = s.split('-').map(Number); return `${d} ${MON[m-1]} ${y}`; };
+const niceRange = (a, b) => a===b ? niceDate(a) : a.slice(0,7)===b.slice(0,7) ? `${Number(a.slice(8))}–${niceDate(b)}` : `${niceDate(a)} – ${niceDate(b)}`;
+const dayLabel = k => { const d = new Date(k + 'T12:00:00'); return `${['Min','Sen','Sel','Rab','Kam','Jum','Sab'][d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`; };
+const monthLabel = k => `${MON[Number(k.slice(5,7))-1]} ${k.slice(0,4)}`;
+// "2026-09-01" atau "9/1/2026" (format bulan/tanggal dari Sheets) → "2026-09-01"
+function toIso(s){
+  s = T(s); let m;
+  if ((m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s))) return `${m[3]}-${pad2(m[1])}-${pad2(m[2])}`;
+  return null;
+}
+// Pilihan periode di atas filter center: periode cepat (dihitung ulang dari hari ini setiap dibuka) + tanggal dari/sampai.
+// Pilihan disimpan di perangkat dengan kunci `key`; onChange dipanggil setiap periode berubah.
+function period(key, onChange){
+  const today = isoDate(new Date());
+  const PRESETS = [
+    ['today', 'Hari ini', () => [today, today]],
+    ['yesterday', 'Kemarin', () => [addDays(today,-1), addDays(today,-1)]],
+    ['week', 'Minggu ini', () => [addDays(today, -((new Date(today + 'T12:00:00').getDay() + 6) % 7)), today]],
+    ['7d', '7 hari', () => [addDays(today,-6), today]],
+    ['month', 'Bulan ini', () => [today.slice(0,8) + '01', today]],
+    ['lastmonth', 'Bulan lalu', () => { const e = addDays(today.slice(0,8) + '01', -1); return [e.slice(0,8) + '01', e]; }],
+    ['30d', '30 hari', () => [addDays(today,-29), today]]
+  ];
+  let range = lsGet(key) || {preset:'month'};
+  const ok = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
+  function resolve(){
+    const p = PRESETS.find(x => x[0]===range.preset);
+    if (p){ const [a, b] = p[2](); range.from = a; range.to = b; }
+    if (!ok(range.from) || !ok(range.to)){ range = {preset:'month'}; return resolve(); }
+    if (range.from > range.to) [range.from, range.to] = [range.to, range.from];
+  }
+  resolve();
+  const $ = s => document.querySelector(s);
+  $('#cChips').insertAdjacentHTML('beforebegin', `<div class="dbar">
+    <div class="cchips" id="pre" role="group" aria-label="Periode">${PRESETS.map(p => `<button type="button" class="cchip" data-p="${p[0]}">${p[1]}</button>`).join('')}</div>
+    <div class="drange"><label>Dari<input type="date" id="dFrom"></label><span aria-hidden="true">–</span><label>Sampai<input type="date" id="dTo"></label></div>
+  </div>`);
+  function sync(){
+    $('#dFrom').value = range.from; $('#dTo').value = range.to;
+    document.querySelectorAll('#pre .cchip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.p===range.preset)));
+  }
+  const set = r => { range = r; resolve(); lsSet(key, range); sync(); onChange(); };
+  $('#pre').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) set({preset: b.dataset.p}); });
+  ['#dFrom','#dTo'].forEach(id => $(id).addEventListener('change', () => {
+    const a = $('#dFrom').value, b = $('#dTo').value; if (a && b) set({preset:'custom', from:a, to:b});
+  }));
+  sync();
+  return {
+    today,
+    get from(){ return range.from; }, get to(){ return range.to; },
+    label: () => niceRange(range.from, range.to),
+    days: () => (new Date(range.to + 'T12:00:00') - new Date(range.from + 'T12:00:00')) / 864e5 + 1,
+    // Batasi pilihan tanggal ke rentang data yang ada
+    bounds(dates){ if (!dates.length) return; const s = dates.slice().sort(); $('#dFrom').min = $('#dTo').min = s[0]; $('#dFrom').max = $('#dTo').max = s[s.length-1]; }
+  };
+}
+// Label umur di Exboard ("6-17 Mo", …) → nama kelas; label lain ditampilkan apa adanya
+const AGE_NAMES = [[/^6\s*-\s*17\s*mo/i, 'Baby'], [/^18\s*-\s*36\s*mo/i, 'Tiny'], [/^3\s*-\s*5\s*yo/i, 'Little'], [/^5\s*-\s*8/i, 'Kids'], [/^9\s*-\s*12\s*yo/i, 'Star']];
+const ageName = s => { s = T(s); if (!s) return 'Lainnya'; const m = AGE_NAMES.find(([re, n]) => re.test(s) || s.toLowerCase()===n.toLowerCase()); return m ? m[1] : s; };
+// Urut Baby → Star, lalu label lain dari umur termuda ("x Mo" = bulan, "x Yo" = tahun)
+const ageMonths = s => { const m = /(\d+)\D*?(mo|yo|bulan|tahun|th)?/i.exec(s); if (!m) return 1e9; return Number(m[1]) * (/^(yo|tahun|th)/i.test(m[2] || s.replace(/^[^a-z]*/i,'')) ? 12 : 1); };
+const AGE_ORDER = AGE_NAMES.map(x => x[1]);
+const ageSort = (a, b) => (AGE_ORDER.indexOf(a) + 1 || 99) - (AGE_ORDER.indexOf(b) + 1 || 99) || ageMonths(a) - ageMonths(b) || a.localeCompare(b);
+// Chip age group; pilihan disimpan dengan kunci `key`. Mengembalikan pilihan saat ini ('ALL' atau nama).
+function ageChips(el, ages, key, onChange){
+  let cur = lsGet(key) || 'ALL';
+  if (cur !== 'ALL' && !ages.includes(cur)) cur = 'ALL';
+  el.className = 'cbar cchips'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Pilih age group');
+  el.innerHTML = ['ALL'].concat(ages).map(a => `<button type="button" class="cchip" data-a="${esc(a)}" aria-pressed="${a===cur}">${a==='ALL' ? 'Semua umur' : esc(a)}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; lsSet(key, b.dataset.a); onChange(b.dataset.a); };
+  return cur;
+}
+
 /* ---------- Muat feed ---------- */
 // page: {render(secs), foot?, feed?, parse?} — render dipanggil dengan hasil parse feed. Mengelola status, error, cache.
 // Default: Feed Dashboard Tambahan dipecah per tab. Halaman lain boleh memberi feed {id,name,cache} dan
@@ -146,5 +225,6 @@ function start(page){
   return {redraw: draw};
 }
 
-window.DA.report = {T, num, fmt, fmtPct, fmtRp, sections, table, monthOf, kpi, bars, tbl, empty, start};
+window.DA.report = {T, num, fmt, fmtPct, fmtRp, sections, table, monthOf, kpi, bars, tbl, empty, start,
+  MON, niceDate, niceRange, dayLabel, monthLabel, toIso, period, ageName, ageSort, ageChips};
 })();

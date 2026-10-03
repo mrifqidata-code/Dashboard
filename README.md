@@ -7,6 +7,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 |---|---|---|---|
 | **Center** | Rekap Acquisition (harian / mingguan / bulanan) | `center/` | Feed Rekap Harian, Feed Rekap Bulanan, Feed Rekap Mingguan Area |
 | | Class Trial (booking → confirmed → show up → paid DP / regis full; per center & age group, periode bebas) | `center/trial/` | Feed Class Trial (QUERY atas sheet Class Trial) |
+| | SUNP (show up not paid: alasan belum DP, potential; per center & age group, periode bebas) | `center/sunp/` | Feed SUNP (tab Feed SUNP di Exboard, rumus di `docs/feed-sunp.md`) |
 | | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | Cash & Piutang (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |

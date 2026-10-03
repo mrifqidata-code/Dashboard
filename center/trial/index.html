@@ -50,54 +50,10 @@ const R = DA.report, {esc} = DA;
 const $ = s => document.querySelector(s);
 DA.mountNav('center-trial');
 const FEED = {id:'1rf4XebE5DbRaHBKwoOnyy9wdbEMrctLgc3VYjXrxezw', name:'Feed Class Trial (dari Exboard)', cache:'dashboardApp.trial.v1'};
-const RANGE_KEY = 'dashboardApp.trialRange', AGE_KEY = 'dashboardApp.trialAge';
-const M = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-const pad = n => String(n).padStart(2, '0');
-const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const add = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); };
-const nice = s => { const [y, m, d] = s.split('-').map(Number); return `${d} ${M[m-1]} ${y}`; };
-const niceRange = (a, b) => a===b ? nice(a) : a.slice(0,7)===b.slice(0,7) ? `${Number(a.slice(8))}–${nice(b)}` : `${nice(a)} – ${nice(b)}`;
-const TODAY = iso(new Date());
-
-// Periode cepat; dihitung ulang dari hari ini setiap dibuka
-const PRESETS = [
-  ['today', 'Hari ini', () => [TODAY, TODAY]],
-  ['yesterday', 'Kemarin', () => [add(TODAY,-1), add(TODAY,-1)]],
-  ['week', 'Minggu ini', () => { const d = new Date(TODAY + 'T12:00:00'); return [add(TODAY, -((d.getDay() + 6) % 7)), TODAY]; }],
-  ['7d', '7 hari', () => [add(TODAY,-6), TODAY]],
-  ['month', 'Bulan ini', () => [TODAY.slice(0,8) + '01', TODAY]],
-  ['lastmonth', 'Bulan lalu', () => { const e = add(TODAY.slice(0,8) + '01', -1); return [e.slice(0,8) + '01', e]; }],
-  ['30d', '30 hari', () => [add(TODAY,-29), TODAY]]
-];
-let range = DA.lsGet(RANGE_KEY) || {preset:'month'};
-function resolve(){
-  const p = PRESETS.find(x => x[0]===range.preset);
-  if (p){ const [a, b] = p[2](); range.from = a; range.to = b; }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(range.from || '') || !/^\d{4}-\d{2}-\d{2}$/.test(range.to || '')){ range = {preset:'month'}; return resolve(); }
-  if (range.from > range.to) [range.from, range.to] = [range.to, range.from];
-}
-resolve();
-let center = DA.center.get(), age = DA.lsGet(AGE_KEY) || 'ALL';
-
-$('#cChips').insertAdjacentHTML('beforebegin', `<div class="dbar">
-  <div class="cchips" id="pre" role="group" aria-label="Periode">${PRESETS.map(p => `<button type="button" class="cchip" data-p="${p[0]}">${p[1]}</button>`).join('')}</div>
-  <div class="drange"><label>Dari<input type="date" id="dFrom"></label><span aria-hidden="true">–</span><label>Sampai<input type="date" id="dTo"></label></div>
-</div>`);
+const AGE_KEY = 'dashboardApp.trialAge';
+const P = R.period('dashboardApp.trialRange', () => view.redraw());
 $('#cChips').insertAdjacentHTML('afterend', '<div class="cbar" id="aChips"></div>');
-function syncRange(){
-  $('#dFrom').value = range.from; $('#dTo').value = range.to;
-  document.querySelectorAll('#pre .cchip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.p===range.preset)));
-}
-$('#pre').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (!b) return; range = {preset: b.dataset.p}; resolve(); DA.lsSet(RANGE_KEY, range); syncRange(); view.redraw(); });
-['#dFrom','#dTo'].forEach(id => $(id).addEventListener('change', () => {
-  const a = $('#dFrom').value, b = $('#dTo').value; if (!a || !b) return;
-  range = {preset:'custom', from:a, to:b}; resolve(); DA.lsSet(RANGE_KEY, range); syncRange(); view.redraw();
-}));
-syncRange();
-
-// Label umur di sheet Class Trial → nama kelas; label lain ditampilkan apa adanya
-const AGES = [[/^6\s*-\s*17\s*mo/i, 'Baby'], [/^18\s*-\s*36\s*mo/i, 'Tiny'], [/^3\s*-\s*5\s*yo/i, 'Little'], [/^5\s*-\s*8/i, 'Kids'], [/^9\s*-\s*12\s*yo/i, 'Star']];
-const ageName = s => { if (!s) return 'Lainnya'; const m = AGES.find(([re, n]) => re.test(s) || s.toLowerCase()===n.toLowerCase()); return m ? m[1] : s; };
+let center = DA.center.get(), age = 'ALL';
 
 // Feed: QUERY atas sheet Class Trial (per sesi) → satu baris per tanggal trial × center × age group
 function parse(text){
@@ -109,12 +65,10 @@ function parse(text){
   const ix = {a: col('age group'), bk: col('booking'), cf: col('confirmed'), su: col('show up'), dp: col('paid dp'), rf: col('regis full'), tp: col('total paid')};
   const out = [];
   for (const r of rows.slice(hi+1)){
-    let d = R.T(r[0]), m;
-    if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(d))) d = `${m[3]}-${pad(m[1])}-${pad(m[2])}`;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.slice(0,10))) continue;
+    const d = R.toIso(r[0]); if (!d) continue;
     const c = R.T(r[1]).toUpperCase(); if (!DA.CENTERS.includes(c)) continue;
     const v = k => ix[k] >= 0 ? (R.num(r[ix[k]]) || 0) : 0;
-    out.push({d: d.slice(0,10), c, a: ageName(R.T(r[ix.a])), bk: v('bk'), cf: v('cf'), su: v('su'), dp: v('dp'), rf: v('rf'), tp: v('tp')});
+    out.push({d, c, a: R.ageName(r[ix.a]), bk: v('bk'), cf: v('cf'), su: v('su'), dp: v('dp'), rf: v('rf'), tp: v('tp')});
   }
   return out;
 }
@@ -123,10 +77,6 @@ const KEYS = ['bk','cf','su','dp','rf','tp'];
 const sum = list => { const t = {bk:0, cf:0, su:0, dp:0, rf:0, tp:0}; list.forEach(x => KEYS.forEach(k => t[k] += x[k])); return t; };
 const pct = (a, b) => b ? a / b * 100 : null;
 const cvrTone = v => v==null ? '' : v >= 45 ? 'g' : v < 35 ? 'r' : 'y';
-// Urut dari umur termuda: "6-17 Mo" < "18-36 Mo" < "3-5 Yo" < … (Mo = bulan, Yo = tahun); label lain di belakang
-const ageMonths = s => { const m = /(\d+)\D*?(mo|yo|bulan|tahun|th)?/i.exec(s); if (!m) return 1e9; return Number(m[1]) * (/^(yo|tahun|th)/i.test(m[2] || s.replace(/^[^a-z]*/i,'')) ? 12 : 1); };
-const AGE_ORDER = AGES.map(x => x[1]);
-const ageSort = (a, b) => (AGE_ORDER.indexOf(a) + 1 || 99) - (AGE_ORDER.indexOf(b) + 1 || 99) || ageMonths(a) - ageMonths(b) || a.localeCompare(b);
 const HEAD = ['Booking','Confirmed','Show up','Paid DP','Regis Full','Total paid','Show up rate','CVR'];
 const cells = t => [R.fmt(t.bk,0), R.fmt(t.cf,0), R.fmt(t.su,0), R.fmt(t.dp,0), R.fmt(t.rf,0), R.fmt(t.tp,0), R.fmtPct(pct(t.su, t.bk)), R.fmtPct(pct(t.tp, t.su))];
 const tones = t => ['','','','','','','', cvrTone(pct(t.tp, t.su))];   // warna hanya di kolom CVR
@@ -136,22 +86,18 @@ const view = R.start({feed: FEED, parse, render, foot: 'Tanggal = tanggal kelas 
 
 function render(all){
   center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
-  const ages = [...new Set(all.map(x => x.a))].sort(ageSort);
-  if (age !== 'ALL' && !ages.includes(age)) age = 'ALL';
-  const ac = $('#aChips');
-  ac.className = 'cbar cchips'; ac.setAttribute('role', 'group'); ac.setAttribute('aria-label', 'Pilih age group');
-  ac.innerHTML = ['ALL'].concat(ages).map(a => `<button type="button" class="cchip" data-a="${esc(a)}" aria-pressed="${a===age}">${a==='ALL' ? 'Semua umur' : esc(a)}</button>`).join('');
-  ac.onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; age = b.dataset.a; DA.lsSet(AGE_KEY, age); view.redraw(); };
+  const ages = [...new Set(all.map(x => x.a))].sort(R.ageSort);
+  age = R.ageChips($('#aChips'), ages, AGE_KEY, () => view.redraw());
 
   const dates = all.map(x => x.d).sort();
-  if (dates.length){ $('#dFrom').min = $('#dTo').min = dates[0]; $('#dFrom').max = $('#dTo').max = dates[dates.length-1]; }
-  const inRange = all.filter(x => x.d >= range.from && x.d <= range.to);
+  P.bounds(dates);
+  const inRange = all.filter(x => x.d >= P.from && x.d <= P.to);
   const inScope = inRange.filter(x => (center==='ALL' || x.c===center) && (age==='ALL' || x.a===age));
   const scopeLabel = [center==='ALL' ? 'Semua center' : center, age==='ALL' ? '' : age].filter(Boolean).join(' · ');
-  $('#sub').textContent = `${niceRange(range.from, range.to)} · ${scopeLabel}`;
+  $('#sub').textContent = `${P.label()} · ${scopeLabel}`;
   if (!inScope.length){
-    const span = dates.length ? ` Data tersedia ${nice(dates[0])} – ${nice(dates[dates.length-1])}.` : '';
-    return R.empty('Belum ada trial di periode ini', `Tidak ada sesi trial ${esc(scopeLabel.toLowerCase())} pada ${esc(niceRange(range.from, range.to))}.${span}`);
+    const span = dates.length ? ` Data tersedia ${R.niceDate(dates[0])} – ${R.niceDate(dates[dates.length-1])}.` : '';
+    return R.empty('Belum ada trial di periode ini', `Tidak ada sesi trial ${esc(scopeLabel.toLowerCase())} pada ${esc(P.label())}.${span}`);
   }
   const t = sum(inScope), cvr = pct(t.tp, t.su);
   let html = `<div class="kpis kpis3">
@@ -189,13 +135,12 @@ function render(all){
   }
 
   // Rincian waktu: per hari bila ≤ 31 hari, selain itu per bulan
-  const days = (new Date(range.to + 'T12:00:00') - new Date(range.from + 'T12:00:00')) / 864e5 + 1;
-  const byMonth = days > 31, keyOf = x => byMonth ? x.d.slice(0,7) : x.d;
+  const byMonth = P.days() > 31, keyOf = x => byMonth ? x.d.slice(0,7) : x.d;
   const keys = [...new Set(inScope.map(keyOf))].sort().reverse();
-  const lab = k => byMonth ? `${M[Number(k.slice(5,7))-1]} ${k.slice(0,4)}` : (() => { const d = new Date(k + 'T12:00:00'); return `${['Min','Sen','Sel','Rab','Kam','Jum','Sab'][d.getDay()]} ${Number(k.slice(8))} ${M[d.getMonth()]}`; })();
+  const lab = byMonth ? R.monthLabel : R.dayLabel;
   html += `<div class="sec-head"><h2>${byMonth ? 'Per bulan' : 'Per hari'}</h2><span class="note" style="margin:0">${esc(scopeLabel)}</span></div>` +
     R.tbl([byMonth ? 'Bulan' : 'Tanggal'].concat(HEAD), keys.map(k => line(lab(k), sum(inScope.filter(x => keyOf(x)===k)))).concat([line('TOTAL', t, 'tot')]));
-  if (range.to > TODAY) html += '<p class="note">Tanggal setelah hari ini berisi booking untuk jadwal trial yang akan datang.</p>';
+  if (P.to > P.today) html += '<p class="note">Tanggal setelah hari ini berisi booking untuk jadwal trial yang akan datang.</p>';
   return html;
 }
 })();
