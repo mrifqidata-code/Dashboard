@@ -6,6 +6,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | Kategori | Sub-menu | Folder | Sumber data |
 |---|---|---|---|
 | **Center** | Rekap Acquisition (harian / mingguan / bulanan) | `center/` | Feed Rekap Harian, Feed Rekap Bulanan, Feed Rekap Mingguan Area |
+| | Class Trial (booking → confirmed → show up → paid DP / regis full; per center & age group, periode bebas) | `center/trial/` | Feed Class Trial (QUERY atas sheet Class Trial) |
 | | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | Cash & Piutang (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
@@ -57,6 +58,9 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   harian, mingguan dan bulanan semuanya dihitung dari tabel itu (Acquisition = FP SD, Revenue dari Revenue Record).
   Sebelum itu: mingguan dari feed mingguan (Acquisition = Paid DP + Paid Full), bulanan dari tab 02 Acquisition
   (hanya Reporting Month yang sedang dipilih di Exboard). Target bulan/minggu berjalan dipro-rata sampai hari ini.
+- Class Trial: feed menjumlahkan sheet Class Trial (satu baris per sesi trial, tanpa data anak) per tanggal trial ×
+  center × age group, mulai awal bulan 6 bulan lalu. Periode cepat (Hari ini … Bulan lalu) dihitung ulang setiap dibuka;
+  tanggal bebas diingat di perangkat. Rentang ≤31 hari dirinci per hari, lebih panjang per bulan.
 - SA Retention: tab 03 belum mencatat center tiap SAR, jadi halaman itu selalu menampilkan semua center.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).

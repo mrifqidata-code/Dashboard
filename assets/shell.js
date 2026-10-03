@@ -13,6 +13,7 @@ const ICON = {
 const NAV = [
   {id:'center', label:'Center', subs:[
     {id:'center', label:'Rekap Acquisition', href:'center/'},
+    {id:'center-trial', label:'Class Trial', href:'center/trial/'},
     {id:'center-retention', label:'Retention', href:'center/retention/'},
     {id:'center-cash', label:'Cash & Piutang', href:'center/cash/'}]},
   {id:'sa', label:'Student Advisor', short:'SA', subs:[
