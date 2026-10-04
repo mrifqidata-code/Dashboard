@@ -50,25 +50,25 @@ const R = DA.report, {esc} = DA;
 const $ = s => document.querySelector(s);
 DA.mountNav('center-trial');
 const FEED = {id:'1rf4XebE5DbRaHBKwoOnyy9wdbEMrctLgc3VYjXrxezw', name:'Feed Class Trial (dari Exboard)', cache:'dashboardApp.trial.v1'};
-const AGE_KEY = 'dashboardApp.trialAge';
+const AGE_KEY = 'dashboardApp.trialAge', TIME_KEY = 'dashboardApp.trialTime';
 const P = R.period('dashboardApp.trialRange', () => view.redraw());
-$('#cChips').insertAdjacentHTML('afterend', '<div class="cbar" id="aChips"></div>');
-let center = DA.center.get(), age = 'ALL';
+$('#cChips').insertAdjacentHTML('afterend', '<div class="cbar" id="aChips"></div><div class="cbar" id="tChips" hidden></div>');
+let center = DA.center.get(), age = 'ALL', time = 'ALL';
 
-// Feed: QUERY atas sheet Class Trial (per sesi) → satu baris per tanggal trial × center × age group
+// Feed: QUERY atas sheet Class Trial (per sesi) → satu baris per tanggal trial × center × age group × jam
 function parse(text){
   const rows = DA.parseCSV(text), first = R.T((rows[0] || [])[0]);
   if (/^#REF/i.test(first)) return 'ref';
   const hi = rows.findIndex(r => /^tanggal$/i.test(R.T(r[0])) && /^center$/i.test(R.T(r[1])));
   if (hi < 0) return first.startsWith('#') ? `!<b>Rumus di feed error (${esc(first)}).</b> Buka feed-nya dan arahkan kursor ke sel A1 untuk melihat pesannya.` : '!<b>Isi feed tidak dikenali.</b> Baris judul (Tanggal, Center, Age Group, …) tidak ditemukan.';
   const head = rows[hi].map(h => R.T(h).toLowerCase()), col = n => head.indexOf(n);
-  const ix = {a: col('age group'), bk: col('booking'), cf: col('confirmed'), su: col('show up'), dp: col('paid dp'), rf: col('regis full'), tp: col('total paid')};
+  const ix = {a: col('age group'), t: col('jam'), bk: col('booking'), cf: col('confirmed'), su: col('show up'), dp: col('paid dp'), rf: col('regis full'), tp: col('total paid')};
   const out = [];
   for (const r of rows.slice(hi+1)){
     const d = R.toIso(r[0]); if (!d) continue;
     const c = R.T(r[1]).toUpperCase(); if (!DA.CENTERS.includes(c)) continue;
     const v = k => ix[k] >= 0 ? (R.num(r[ix[k]]) || 0) : 0;
-    out.push({d, c, a: R.ageName(r[ix.a]), bk: v('bk'), cf: v('cf'), su: v('su'), dp: v('dp'), rf: v('rf'), tp: v('tp')});
+    out.push({d, c, a: R.ageName(r[ix.a]), t: ix.t >= 0 ? R.toTime(r[ix.t]) : '', bk: v('bk'), cf: v('cf'), su: v('su'), dp: v('dp'), rf: v('rf'), tp: v('tp')});
   }
   return out;
 }
@@ -88,12 +88,17 @@ function render(all){
   center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
   const ages = [...new Set(all.map(x => x.a))].sort(R.ageSort);
   age = R.ageChips($('#aChips'), ages, AGE_KEY, () => view.redraw());
+  // Jam sesi; baris chip hanya muncul bila feed sudah punya kolom Jam
+  const times = [...new Set(all.map(x => x.t).filter(Boolean))].sort(R.timeSort);
+  $('#tChips').hidden = !times.length;
+  time = times.length ? R.pickChips($('#tChips'), times, TIME_KEY, {all:'Semua jam', aria:'Pilih jam'}, () => view.redraw()) : 'ALL';
+  const fC = x => center==='ALL' || x.c===center, fA = x => age==='ALL' || x.a===age, fT = x => time==='ALL' || x.t===time;
 
   const dates = all.map(x => x.d).sort();
   P.bounds(dates);
   const inRange = all.filter(x => x.d >= P.from && x.d <= P.to);
-  const inScope = inRange.filter(x => (center==='ALL' || x.c===center) && (age==='ALL' || x.a===age));
-  const scopeLabel = [center==='ALL' ? 'Semua center' : center, age==='ALL' ? '' : age].filter(Boolean).join(' · ');
+  const inScope = inRange.filter(x => fC(x) && fA(x) && fT(x));
+  const scopeLabel = [center==='ALL' ? 'Semua center' : center, age==='ALL' ? '' : age, time==='ALL' ? '' : 'jam ' + time].filter(Boolean).join(' · ');
   $('#sub').textContent = `${P.label()} · ${scopeLabel}`;
   if (!inScope.length){
     const span = dates.length ? ` Data tersedia ${R.niceDate(dates[0])} – ${R.niceDate(dates[dates.length-1])}.` : '';
@@ -115,13 +120,13 @@ function render(all){
     <p class="note">Persen = terhadap booking. CVR hijau ≥45%, merah &lt;35%.</p></div>`;
 
   if (center==='ALL'){
-    const base = inRange.filter(x => age==='ALL' || x.a===age);
-    html += `<div class="sec-head"><h2>Per center</h2>${age==='ALL' ? '' : `<span class="note" style="margin:0">${esc(age)}</span>`}</div>` +
+    const base = inRange.filter(x => fA(x) && fT(x)), sub = [age==='ALL' ? '' : age, time==='ALL' ? '' : 'jam ' + time].filter(Boolean).join(' · ');
+    html += `<div class="sec-head"><h2>Per center</h2>${sub ? `<span class="note" style="margin:0">${esc(sub)}</span>` : ''}</div>` +
       R.tbl(['Center'].concat(HEAD), DA.CENTERS.map(c => line(c, sum(base.filter(x => x.c===c)))).concat([line('TOTAL', sum(base), 'tot')]));
   }
   if (age==='ALL'){
-    const base = inRange.filter(x => center==='ALL' || x.c===center);
-    html += `<div class="sec-head"><h2>Per age group</h2><span class="note" style="margin:0">${esc(center==='ALL' ? 'Semua center' : center)}</span></div>` +
+    const base = inRange.filter(x => fC(x) && fT(x));
+    html += `<div class="sec-head"><h2>Per age group</h2><span class="note" style="margin:0">${esc([center==='ALL' ? 'Semua center' : center, time==='ALL' ? '' : 'jam ' + time].filter(Boolean).join(' · '))}</span></div>` +
       R.tbl(['Age group'].concat(HEAD), ages.map(a => line(esc(a), sum(base.filter(x => x.a===a)))).filter(r => r.cells[1] !== '0' || r.cells[3] !== '0').concat([line('TOTAL', sum(base), 'tot')]));
     if (center==='ALL'){
       // Matriks center × age group untuk satu angka: total paid (show up di bawahnya)
@@ -132,6 +137,12 @@ function render(all){
           return {cls: c==='TOTAL' ? 'tot' : '', cells: [c].concat(ages.map(a => cell(rowsC.filter(x => x.a===a))), [cell(rowsC)])};
         }));
     }
+  }
+
+  if (time==='ALL' && times.length){
+    const base = inRange.filter(x => fC(x) && fA(x));
+    html += `<div class="sec-head"><h2>Per jam</h2><span class="note" style="margin:0">${esc([center==='ALL' ? 'Semua center' : center, age==='ALL' ? '' : age].filter(Boolean).join(' · '))}</span></div>` +
+      R.tbl(['Jam'].concat(HEAD), times.map(h => line(esc(h), sum(base.filter(x => x.t===h)))).filter(r => r.cells[1] !== '0' || r.cells[3] !== '0').concat([line('TOTAL', sum(base), 'tot')]));
   }
 
   // Rincian waktu: per hari bila ≤ 31 hari, selain itu per bulan

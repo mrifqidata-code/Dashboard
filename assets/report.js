@@ -158,15 +158,25 @@ const ageName = s => { s = T(s); if (!s) return 'Lainnya'; const m = AGE_NAMES.f
 const ageMonths = s => { const m = /(\d+)\D*?(mo|yo|bulan|tahun|th)?/i.exec(s); if (!m) return 1e9; return Number(m[1]) * (/^(yo|tahun|th)/i.test(m[2] || s.replace(/^[^a-z]*/i,'')) ? 12 : 1); };
 const AGE_ORDER = AGE_NAMES.map(x => x[1]);
 const ageSort = (a, b) => (AGE_ORDER.indexOf(a) + 1 || 99) - (AGE_ORDER.indexOf(b) + 1 || 99) || ageMonths(a) - ageMonths(b) || a.localeCompare(b);
-// Chip age group; pilihan disimpan dengan kunci `key`. Mengembalikan pilihan saat ini ('ALL' atau nama).
-function ageChips(el, ages, key, onChange){
+// Baris chip pilihan (age group, jam, …); pilihan disimpan dengan kunci `key`. Mengembalikan pilihan saat ini ('ALL' atau nilai).
+function pickChips(el, items, key, opts, onChange){
   let cur = lsGet(key) || 'ALL';
-  if (cur !== 'ALL' && !ages.includes(cur)) cur = 'ALL';
-  el.className = 'cbar cchips'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Pilih age group');
-  el.innerHTML = ['ALL'].concat(ages).map(a => `<button type="button" class="cchip" data-a="${esc(a)}" aria-pressed="${a===cur}">${a==='ALL' ? 'Semua umur' : esc(a)}</button>`).join('');
-  el.onclick = e => { const b = e.target.closest('[data-a]'); if (!b) return; lsSet(key, b.dataset.a); onChange(b.dataset.a); };
+  if (cur !== 'ALL' && !items.includes(cur)) cur = 'ALL';
+  el.className = 'cbar cchips'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', opts.aria);
+  el.innerHTML = ['ALL'].concat(items).map(a => `<button type="button" class="cchip" data-v="${esc(a)}" aria-pressed="${a===cur}">${a==='ALL' ? esc(opts.all) : esc(a)}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; lsSet(key, b.dataset.v); onChange(b.dataset.v); };
   return cur;
 }
+const ageChips = (el, ages, key, onChange) => pickChips(el, ages, key, {all:'Semua umur', aria:'Pilih age group'}, onChange);
+// Jam sesi dari Sheets ("9:00:00", "09.00", "1:30:00 PM", "09.00 - 10.00") → "09:00"; teks lain apa adanya
+function toTime(s){
+  s = T(s); const m = /(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(am|pm)?/i.exec(s);
+  if (!m) return s || 'Lainnya';
+  let h = Number(m[1]); const ap = (m[3] || '').toLowerCase();
+  if (ap==='pm' && h < 12) h += 12; if (ap==='am' && h===12) h = 0;
+  return `${pad2(h)}:${m[2]}`;
+}
+const timeSort = (a, b) => (/^\d\d:\d\d$/.test(b) - /^\d\d:\d\d$/.test(a)) || a.localeCompare(b);
 
 /* ---------- Muat feed ---------- */
 // page: {render(secs), foot?, feed?, parse?} — render dipanggil dengan hasil parse feed. Mengelola status, error, cache.
@@ -226,5 +236,5 @@ function start(page){
 }
 
 window.DA.report = {T, num, fmt, fmtPct, fmtRp, sections, table, monthOf, kpi, bars, tbl, empty, start,
-  MON, niceDate, niceRange, dayLabel, monthLabel, toIso, period, ageName, ageSort, ageChips};
+  MON, niceDate, niceRange, dayLabel, monthLabel, toIso, period, ageName, ageSort, ageChips, pickChips, toTime, timeSort};
 })();
