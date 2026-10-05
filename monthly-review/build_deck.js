@@ -16,8 +16,8 @@ const OUT = process.argv[2] || path.join(__dirname, "Monthly_Review_September_20
 // ---------------------------------------------------------------- THEME
 const THEME = {
   name: "Sparks Swim Monthly Review",
-  headFontFace: "Calibri",
-  bodyFontFace: "Calibri",
+  headFontFace: "Poppins",
+  bodyFontFace: "Poppins",
   colors: {
     dk1: "13242E", lt1: "FFFFFF", dk2: "0A3D4A", lt2: "EEF4F5",
     accent1: "0B6475", accent2: "35B6B4", accent3: "D9482B", accent4: "E39B2D",
@@ -42,6 +42,7 @@ const D = {
   HIB: { name: "Harapan Indah", rev: 403, revAug: 325.3, fp: 82, leads: 367, leadsAug: 565, su: 201, suAug: 292, paid: 74, sur: 54.8, cvr: 36.8, cvrD: 12.8, fpp: 79.7, fppD: 2.6, dp: 15, sunp: 156, top: "Diskusi dengan keluarga", renew: 1, util: 9.8, seats: 1768, zero: 257, empty: 84, isNew: true },
 };
 const AREA = { rev: 2452, revAug: 2713.6, target: 3600, fp: 387, leads: 2016, leadsAug: 3097, su: 993, suAug: 1543, paid: 411, paidAug: 532, sur: 49.3, cvr: 41.4, cvrD: 6.7, fpp: 72.0, fppD: 1.4, dp: 115, sunp: 708, renew: 224, util: 26.4, seats: 7426 };
+const SHORT_TOP = { "Diskusi dengan keluarga": "Diskusi keluarga", "Tidak tertarik / coba saja": "Hanya ingin coba", "Jadwal kelas tidak cocok": "Jadwal tidak cocok" };
 const SUNP_REASONS = [
   { r: "Diskusi dengan keluarga", n: 131, p: 18.5, c: "HIB (54)" },
   { r: "Harga / kemahalan", n: 100, p: 14.1, c: "BTU (28)" },
@@ -89,8 +90,8 @@ const id = (n) => Math.round(n).toLocaleString("id-ID");
 const dec = (n, k = 1) => n.toFixed(k).replace(".", ",");
 const pct = (n, k = 1) => `${dec(n, k)}%`;
 const chg = (now, before) => (now / before - 1) * 100;
-const arrowPct = (v, k = 0) => (Math.abs(v) < 0.5 ? "● 0%" : `${v > 0 ? "▲" : "▼"} ${dec(Math.abs(v), k)}%`);
-const arrowPp = (v) => `${v > 0 ? "▲" : "▼"} ${dec(Math.abs(v))} pp`;
+const arrowPct = (v, k = 0) => (Math.abs(v) < 0.5 ? "●\u00a00%" : `${v > 0 ? "▲" : "▼"}\u00a0${dec(Math.abs(v), k)}%`);
+const arrowPp = (v) => `${v > 0 ? "▲" : "▼"}\u00a0${dec(Math.abs(v))}\u00a0pp`;
 const pctTarget = (c) => Math.round((D[c].rev / TARGET) * 100);
 
 // ---------------------------------------------------------------- PRES
@@ -109,8 +110,8 @@ pres.defineSlideMaster({
   title: "COVER",
   background: { color: C.text2 },
   objects: [
-    { placeholder: { options: { name: "title", type: "title", x: X0, y: 2.05, w: 7.4, h: 2.0, fontSize: 44, bold: true, color: C.background1, align: "left", valign: "top", margin: 0 }, text: "" } },
-    { placeholder: { options: { name: "body", type: "body", x: X0, y: 4.25, w: 7.0, h: 0.9, fontSize: 18, color: C.background2, valign: "top", margin: 0 }, text: "" } },
+    { placeholder: { options: { name: "title", type: "title", x: X0, y: 1.95, w: 7.6, h: 2.3, fontSize: 40, bold: true, color: C.background1, align: "left", valign: "top", margin: 0 }, text: "" } },
+    { placeholder: { options: { name: "body", type: "body", x: X0, y: 3.75, w: 7.4, h: 0.9, fontSize: 16, color: C.background2, valign: "top", margin: 0 }, text: "" } },
   ],
 });
 pres.defineSlideMaster({
@@ -154,6 +155,7 @@ function newSlide(kicker, title, section) {
   return s;
 }
 function source(s, text) {
+  if (text.length > 140) console.warn(`source > 140 karakter (${text.length}): ${text.slice(0, 60)}…`);
   s.addText(text, { x: X0, y: 6.64, w: CW, h: 0.3, fontSize: 10, color: C.accent6, italic: true, margin: 0, valign: "top", isTextBox: true, objectName: oname("source") });
 }
 function card(s, x, y, w, h, fill = C.background2) {
@@ -173,8 +175,8 @@ function kpiTile(s, x, y, w, h, { label, value, sub, status, statusText }) {
   card(s, x, y, w, h);
   s.addText(label.toUpperCase(), { x: x + 0.25, y: y + 0.2, w: w - 1.9, h: 0.3, fontSize: 12, bold: true, color: C.accent6, charSpacing: 1, margin: 0, isTextBox: true });
   if (status) chip(s, statusText, x + w - 1.55, y + 0.2, 1.3, status);
-  s.addText(value, { x: x + 0.25, y: y + 0.55, w: w - 0.5, h: 0.75, fontSize: 36, bold: true, color: C.text1, margin: 0, valign: "middle", isTextBox: true });
-  s.addText(sub, { x: x + 0.25, y: y + 1.35, w: w - 0.5, h: h - 1.5, fontSize: 14, color: C.text1, margin: 0, valign: "top", isTextBox: true });
+  s.addText(value, { x: x + 0.25, y: y + 0.5, w: w - 0.5, h: 0.72, fontSize: 34, bold: true, color: C.text1, margin: 0, valign: "middle", isTextBox: true });
+  s.addText(sub, { x: x + 0.25, y: y + 1.25, w: w - 0.5, h: h - 1.33, fontSize: 14, color: C.text1, margin: 0, valign: "top", isTextBox: true });
 }
 const chartText = () => ({
   catAxisLabelColor: TINT.axis, valAxisLabelColor: TINT.axis, catAxisLabelFontSize: 13, valAxisLabelFontSize: 11,
@@ -236,8 +238,8 @@ async function build() {
       card(s, x, y, w, h);
       iconDot(s, ic, x + 0.3, y + 0.35, 0.7, i === 1 ? C.accent3 : C.accent1);
       s.addText(n, { x: x + w - 1.3, y: y + 0.3, w: 1.0, h: 0.8, fontSize: 40, bold: true, color: C.accent2, align: "right", margin: 0, isTextBox: true });
-      s.addText(t, { x: x + 0.3, y: y + 1.4, w: w - 0.6, h: 1.1, fontSize: 22, bold: true, color: C.text1, valign: "top", margin: 0, isTextBox: true });
-      s.addText(d, { x: x + 0.3, y: y + 2.6, w: w - 0.6, h: 1.4, fontSize: 15, color: C.text1, valign: "top", margin: 0, isTextBox: true });
+      s.addText(t, { x: x + 0.3, y: y + 1.35, w: w - 0.6, h: 1.3, fontSize: 20, bold: true, color: C.text1, valign: "top", margin: 0, isTextBox: true });
+      s.addText(d, { x: x + 0.3, y: y + 2.8, w: w - 0.6, h: 1.35, fontSize: 14, color: C.text1, valign: "top", margin: 0, isTextBox: true });
     });
     s.addNotes("Urutan sesuai alur meeting: (1) fakta September, (2) center yang perlu improvement, (3) strategi, (4) komitmen tiap center. Komitmen di bagian 4 adalah draft; angkanya kita sepakati bersama di meeting.");
   }
@@ -255,16 +257,16 @@ async function build() {
     const tiles = [
       { label: "Revenue area", value: `Rp ${dec(AREA.rev / 1000, 2)} M`, sub: `${Math.round((AREA.rev / AREA.target) * 100)}% dari target Rp 3,6 M · ${arrowPct(chg(AREA.rev, AREA.revAug))} vs Agustus`, status: "bad", statusText: "68% target" },
       { label: "Gap ke target", value: `– Rp ${id(AREA.target - AREA.rev)} jt`, sub: "Gap terbesar di TMP (Rp 379 jt) dan PML (Rp 289 jt)", status: "bad", statusText: "Gap" },
-      { label: "Center ≥ target", value: `${onTarget.length} dari 6`, sub: `Hanya KLM (${pctTarget("KLM")}%). Center lain 37–79%`, status: "warn", statusText: "Perlu naik" },
+      { label: "Center ≥ target", value: `${onTarget.length} dari 6`, sub: `Hanya KLM (${pctTarget("KLM")}%). Center lain antara 37% dan 79%`, status: "warn", statusText: "Perlu naik" },
       { label: "Show up trial", value: id(AREA.su), sub: `${arrowPct(chg(AREA.su, AREA.suAug))} vs Agustus (${id(AREA.suAug)}). Leads ${arrowPct(chg(AREA.leads, AREA.leadsAug))}`, status: "bad", statusText: "Volume turun" },
-      { label: "CVR show up → paid", value: pct(AREA.cvr), sub: `${arrowPp(AREA.cvrD)} vs Agustus · target 45%`, status: "good", statusText: "Membaik" },
+      { label: "CVR SU → paid", value: pct(AREA.cvr), sub: `${arrowPp(AREA.cvrD)} vs Agustus · target 45%`, status: "good", statusText: "Membaik" },
       { label: "FP progress", value: pct(AREA.fpp), sub: `${arrowPp(AREA.fppD)} · ambang sehat 85% · ${AREA.dp} DP belum lunas`, status: "warn", statusText: "Belum sehat" },
     ];
     tiles.forEach((t, i) => kpiTile(s, X0 + (i % 3) * (w + gap), 1.7 + Math.floor(i / 3) * (h + 0.2), w, h, t));
     card(s, X0, 5.98, CW, 0.5, C.background2);
     s.addText([
       { text: "Konteks: ", options: { bold: true } },
-      { text: "TMP, BTU, HIB baru bulan ke-2 setelah grand opening (11–12 Agt). Lonjakan leads Agustus tidak berulang di September." },
+      { text: "TMP, BTU, HIB baru bulan ke-2 setelah grand opening (11–12 Agt)." },
     ], { x: X0 + 0.25, y: 5.98, w: CW - 0.5, h: 0.5, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
     source(s, "Sumber: Exboard › 02 Acquisition (deck SA League September), data per 4 Okt 2026. Agustus: Center Performance Agustus 2026.");
     s.addNotes("Pesan utama September: (1) volume turun tajam, show up -36% dan leads -35% vs Agustus, sebagian karena efek grand opening 3 center baru sudah habis; (2) kualitas closing justru membaik, CVR naik 6,7 pp ke 41,4%; (3) uang belum masuk penuh, FP progress 72% dan 115 murid masih DP. Hasilnya revenue Rp 2,45 M, 68% dari target, gap Rp 1,15 M.");
@@ -295,7 +297,7 @@ async function build() {
       { text: "HIB satu-satunya yang tumbuh ", options: { bold: true } },
       { text: "(▲24%). TMP turun paling dalam (▼33%) dan paling jauh dari target." },
     ], { x: 8.5, y: 5.6, w: 4.23, h: 0.9, fontSize: 14, color: C.text1, valign: "top", margin: 0, isTextBox: true });
-    source(s, "Target September Rp 600 jt per center (total Rp 3,6 M). Sumber: Exboard › 02 Acquisition, per 4 Okt 2026; Agustus: Center Performance Agustus 2026.");
+    source(s, "Target September Rp 600 jt per center (total Rp 3,6 M). Sumber: Exboard › 02 Acquisition (per 4 Okt 2026); Agustus: Center Performance.");
     s.addNotes("KLM 109% dan jadi Center of the Month. KWC 79%, HIB 67%, BTU 66%, PML 52%, TMP 37%. Gap per center ke Rp 600 jt: KWC -127, PML -289, TMP -379, BTU -207, HIB -197 (Rp jt). HIB satu-satunya yang revenue-nya naik dari Agustus.");
   }
 
@@ -305,28 +307,28 @@ async function build() {
     s.addChart(pres.charts.BAR, [
       { name: "Agustus", labels: CENTERS, values: CENTERS.map((c) => D[c].suAug) },
       { name: "September", labels: CENTERS, values: CENTERS.map((c) => D[c].su) },
-    ], { x: X0, y: 1.65, w: 7.6, h: 4.85, barGrouping: "clustered", barGapWidthPct: 60, chartColors: ["A9CDD3", HEX.accent1], ...chartText(), showLegend: true, legendPos: "b",
+    ], { x: X0, y: 1.65, w: 7.2, h: 4.85, barGrouping: "clustered", barGapWidthPct: 60, chartColors: ["A9CDD3", HEX.accent1], ...chartText(), showLegend: true, legendPos: "b",
       valAxisMinVal: 0, valAxisMaxVal: 350, valAxisMajorUnit: 50, showValue: true, dataLabelPosition: "outEnd", showTitle: true, title: "Show up trial per center", titleFontSize: 14, titleColor: HEX.dk1, objectName: "chart-showup" });
-    const x = 8.5, w = 4.23;
+    const x = 8.1, w = W - X0 - 8.1;
     const rows = [
       ["Leads", `${id(AREA.leadsAug)} → ${id(AREA.leads)}`, arrowPct(chg(AREA.leads, AREA.leadsAug)), "bad"],
       ["Show up", `${id(AREA.suAug)} → ${id(AREA.su)}`, arrowPct(chg(AREA.su, AREA.suAug)), "bad"],
-      ["Paid (DP+FP)", `${id(AREA.paidAug)} → ${id(AREA.paid)}`, arrowPct(chg(AREA.paid, AREA.paidAug)), "warn"],
-      ["CVR SU → paid", `${pct(AREA.cvr - AREA.cvrD)} → ${pct(AREA.cvr)}`, arrowPp(AREA.cvrD), "good"],
+      ["Paid", `${id(AREA.paidAug)} → ${id(AREA.paid)}`, arrowPct(chg(AREA.paid, AREA.paidAug)), "warn"],
+      ["CVR", `${pct(AREA.cvr - AREA.cvrD)} → ${pct(AREA.cvr)}`, arrowPp(AREA.cvrD), "good"],
     ];
     s.addText("FUNNEL AREA · AGT → SEP", { x, y: 1.75, w, h: 0.3, fontSize: 12, bold: true, color: C.accent6, charSpacing: 1, margin: 0, isTextBox: true });
     rows.forEach(([l, v, d, st], i) => {
       const y = 2.15 + i * 0.78;
       card(s, x, y, w, 0.66);
-      s.addText(l, { x: x + 0.2, y, w: 1.45, h: 0.66, fontSize: 14, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-      s.addText(v, { x: x + 1.6, y, w: 1.45, h: 0.66, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+      s.addText(l, { x: x + 0.2, y, w: 1.25, h: 0.66, fontSize: 14, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+      s.addText(v, { x: x + 1.45, y, w: 1.95, h: 0.66, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
       chip(s, d, x + w - 1.15, y + 0.18, 1.0, st);
     });
     s.addText([
       { text: "Rasio stabil, jumlahnya yang hilang. ", options: { bold: true } },
-      { text: "Show-up rate tetap ±49% dan CVR naik — penurunan revenue datang dari sedikitnya orang yang masuk funnel." },
+      { text: "Show-up rate tetap ±49% dan CVR naik. Revenue turun karena makin sedikit orang yang masuk funnel." },
     ], { x, y: 5.3, w, h: 1.2, fontSize: 14, color: C.text1, valign: "top", margin: 0, isTextBox: true });
-    source(s, "Sumber: Exboard › 02 Acquisition (SA League September), per 4 Okt 2026; Agustus: Center Performance Agustus 2026. CVR = total paid ÷ show up.");
+    source(s, "Paid = DP + FP. CVR = total paid ÷ show up. Sumber: Exboard › 02 Acquisition (per 4 Okt 2026); Agustus: Center Performance Agustus.");
     s.addNotes("Show up turun di semua center: TMP -50%, PML -43%, KLM -36%, BTU -31%, HIB -31%, KWC -24%. Show-up rate area stabil 49%, CVR naik ke 41,4%. Artinya tim SA closing lebih baik; yang kurang adalah volume leads yang masuk. Ini jadi Strategi 1.");
   }
 
@@ -334,20 +336,20 @@ async function build() {
   {
     const s = newSlide(K1, "708 trial belum closing, 2/3 karena 5 alasan", S1);
     s.addChart(pres.charts.BAR, [{ name: "Kasus SUNP", labels: SUNP_REASONS.map((r) => r.r), values: SUNP_REASONS.map((r) => r.n) }], {
-      x: X0, y: 1.65, w: 7.6, h: 4.85, barDir: "bar", chartColors: [HEX.accent1], ...chartText(), catAxisOrientation: "maxMin", catAxisLabelFontSize: 14,
+      x: X0, y: 1.65, w: 7.2, h: 4.85, barDir: "bar", chartColors: [HEX.accent1], ...chartText(), catAxisOrientation: "maxMin", catAxisLabelFontSize: 14,
       valAxisHidden: true, valGridLine: { style: "none" }, showValue: true, dataLabelPosition: "outEnd", dataLabelFontSize: 13, barGapWidthPct: 45, showLegend: false,
       showTitle: true, title: "Top 5 alasan Show Up Not Paid (kasus)", titleFontSize: 14, titleColor: HEX.dk1, objectName: "chart-sunp" });
-    const x = 8.5, w = 4.23;
+    const x = 8.1, w = W - X0 - 8.1;
     s.addText("ALASAN #1 PER CENTER", { x, y: 1.75, w, h: 0.3, fontSize: 12, bold: true, color: C.accent6, charSpacing: 1, margin: 0, isTextBox: true });
     CENTERS.forEach((c, i) => {
       const y = 2.15 + i * 0.62;
       card(s, x, y, w, 0.52);
-      chip(s, c, x + 0.15, y + 0.11, 0.75, D[c].isNew ? "dark" : "teal");
-      s.addText(D[c].top, { x: x + 1.05, y, w: w - 1.95, h: 0.52, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-      s.addText(id(D[c].sunp), { x: x + w - 0.85, y, w: 0.7, h: 0.52, fontSize: 14, bold: true, color: C.accent6, align: "right", valign: "middle", margin: 0, isTextBox: true });
+      chip(s, c, x + 0.15, y + 0.11, 0.7, D[c].isNew ? "dark" : "teal");
+      s.addText(SHORT_TOP[D[c].top] || D[c].top, { x: x + 1.0, y, w: w - 1.75, h: 0.52, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+      s.addText(id(D[c].sunp), { x: x + w - 0.7, y, w: 0.55, h: 0.52, fontSize: 14, bold: true, color: C.accent6, align: "right", valign: "middle", margin: 0, isTextBox: true });
     });
     s.addText("Angka kanan = total SUNP center itu", { x, y: 5.9, w, h: 0.3, fontSize: 11, color: C.accent6, margin: 0, isTextBox: true });
-    source(s, "Terbanyak per alasan: keluarga → HIB (54) · harga → BTU (28) · jadwal → BTU (50) · coba saja → KLM (17) · jauh → KLM (18). 5 alasan = 66% dari 708 kasus. Sumber: Exboard › 02 Acquisition.");
+    source(s, "5 alasan = 66% dari 708 kasus. Terbanyak: keluarga → HIB (54) · harga → BTU (28) · jadwal → BTU (50) · jauh → KLM (18). Sumber: Exboard 02.");
     s.addNotes("SUNP = Show Up Not Paid. Lima alasan ini 66% dari 708 kasus. Dua pola penting: (1) 'diskusi dengan keluarga' = pengambil keputusan tidak ikut trial, paling banyak di HIB; (2) 'jadwal tidak cocok' 50 dari 95 kasus ada di BTU, padahal utilisasi BTU baru 10% — jamnya yang belum pas. Playbook jawabannya ada di Strategi 2.");
   }
 
@@ -412,52 +414,37 @@ async function build() {
       s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: X0 + i * 1.95, y: ly + 0.05, w: 0.3, h: 0.25, fill: { color: TINT[st] }, line: { color: TINT[`${st}Ink`], width: 0.75 }, rectRadius: 0.05, objectName: oname("legend") });
       s.addText(t, { x: X0 + 0.4 + i * 1.95, y: ly, w: 1.5, h: 0.35, fontSize: 12, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
     });
-    s.addText("* center baru (grand opening 11–12 Agt) — utilisasi rendah masih wajar di bulan ke-2", { x: X0 + 5.9, y: ly, w: CW - 5.9, h: 0.35, fontSize: 12, color: C.accent6, valign: "middle", align: "right", margin: 0, isTextBox: true });
-    source(s, "Ambang: % target ≥100 hijau, 75–99 kuning · CVR ≥45% hijau, 35–45% kuning · FP progress ≥85% hijau, 75–85% kuning · utilisasi ≥50% hijau, 30–50% kuning. Sumber: Exboard 02 & 08.");
+    s.addText("* center baru (grand opening 11–12 Agt): utilisasi rendah masih wajar", { x: X0 + 5.9, y: ly, w: CW - 5.9, h: 0.35, fontSize: 12, color: C.accent6, valign: "middle", align: "right", margin: 0, isTextBox: true });
+    source(s, "Hijau: % target ≥100 · CVR ≥45% · FP progress ≥85% · utilisasi ≥50%. Kuning: 75–99 · 35–45% · 75–85% · 30–50%. Sumber: Exboard 02 & 08.");
     s.addNotes("Baca per baris. TMP merah di hampir semua kolom kecuali CVR. PML merah di revenue dan volume. KWC tertahan di FP progress 61%. BTU dan HIB kuning: BTU bocor di jadwal, HIB bocor di CVR. KLM hijau di revenue dan FP progress tapi volumenya juga turun 36%.");
   }
 
   // 9 · Prioritas ----------------------------------------------------------
   {
     const s = newSlide(K2, "Prioritas improvement Oktober", S2);
-    const cols = [
-      { t: "Prioritas 1 · intervensi penuh", st: "bad", items: [
-        ["TMP", "Revenue terendah. FP progress 43,5%, 35 DP belum lunas", "Leads −52% setelah grand opening"],
-        ["PML", "Leads −47%, show up −43%", "SUNP #1 “coba saja” → kualitas lead"],
-      ] },
-      { t: "Prioritas 2 · tutup satu kebocoran", st: "warn", items: [
-        ["KWC", "FP progress 61,4%, 27 DP belum lunas", "Bocor di pelunasan"],
-        ["BTU", "50 kasus “jadwal tidak cocok”", "Bocor di jadwal & harga"],
-        ["HIB", "CVR 36,8% terendah, SUNP 156", "Bocor di “diskusi keluarga”"],
-      ] },
-      { t: "Jaga momentum", st: "good", items: [
-        ["KLM", "Show up −36%, CVR 39,6% < 45%", "Jaga di atas Rp 600 jt"],
-      ] },
+    const rowsP = [
+      ["Prioritas 1", "bad", "TMP", "Revenue terendah; FP progress 43,5%", "35 DP belum lunas · leads −52% setelah grand opening"],
+      ["Prioritas 1", "bad", "PML", "Leads −47%, show up −43%", "SUNP #1 “coba saja” → kualitas lead"],
+      ["Prioritas 2", "warn", "KWC", "FP progress 61,4%, terendah di center matang", "27 DP belum lunas → bocor di pelunasan"],
+      ["Prioritas 2", "warn", "BTU", "50 kasus “jadwal tidak cocok”", "Bocor di jadwal & harga"],
+      ["Prioritas 2", "warn", "HIB", "CVR 36,8% terendah, SUNP 156", "Bocor di “diskusi keluarga”"],
+      ["Jaga momentum", "good", "KLM", "Show up −36%, CVR 39,6% < 45%", "Jaga tetap di atas Rp 600 jt"],
     ];
-    const gap = 0.3, w = (CW - 2 * gap) / 3, top = 1.7, bottom = 6.6;
-    cols.forEach((col, i) => {
-      const x = X0 + i * (w + gap);
-      chip(s, col.t, x, top, w, col.st);
-      const n = col.items.length, cg = 0.15, ch = n === 1 ? 1.75 : (bottom - (top + 0.5) - (n - 1) * cg) / n;
-      col.items.forEach(([c, issue, cause], j) => {
-        const y = top + 0.5 + j * (ch + cg);
-        card(s, x, y, w, ch);
-        s.addText(c, { x: x + 0.25, y: y + 0.15, w: 1.2, h: 0.5, fontSize: 24, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-        chip(s, `${pctTarget(c)}% target`, x + w - 1.55, y + 0.25, 1.3, stTarget(pctTarget(c)));
-        s.addText(issue, { x: x + 0.25, y: y + 0.62, w: w - 0.5, h: ch - 1.04, fontSize: 14, bold: true, color: C.text1, valign: "top", margin: 0, isTextBox: true });
-        s.addText(cause, { x: x + 0.25, y: y + ch - 0.42, w: w - 0.5, h: 0.32, fontSize: 14, color: C.accent6, valign: "top", margin: 0, isTextBox: true });
-      });
+    const cx = { pr: 0, c: 2.05, t: 3.05, is: 4.5, ca: 8.55 };
+    const cw = { pr: 1.85, c: 0.9, t: 1.25, is: 3.85, ca: CW - 8.55 - 0.2 };
+    [["PRIORITAS", "pr"], ["CENTER", "c"], ["% TARGET", "t"], ["MASALAH UTAMA", "is"], ["AKAR MASALAH", "ca"]].forEach(([t, k]) =>
+      s.addText(t, { x: X0 + cx[k] + (k === "pr" ? 0.15 : 0), y: 1.62, w: cw[k], h: 0.3, fontSize: 12, bold: true, color: C.accent6, charSpacing: 1, margin: 0, isTextBox: true }));
+    const rh = 0.66, rg = 0.08;
+    rowsP.forEach(([pr, st, c, issue, cause], i) => {
+      const y = 2.0 + i * (rh + rg);
+      card(s, X0, y, CW, rh);
+      chip(s, pr, X0 + 0.15, y + (rh - 0.3) / 2, cw.pr - 0.15, st);
+      s.addText(c, { x: X0 + cx.c, y, w: cw.c, h: rh, fontSize: 20, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+      chip(s, `${pctTarget(c)}%`, X0 + cx.t, y + (rh - 0.3) / 2, 1.0, stTarget(pctTarget(c)));
+      s.addText(issue, { x: X0 + cx.is, y, w: cw.is, h: rh, fontSize: 14, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+      s.addText(cause, { x: X0 + cx.ca, y, w: cw.ca, h: rh, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
     });
-    {
-      const x = X0 + 2 * (w + gap), y = 1.7 + 0.5 + 1.75 + 0.15;
-      card(s, x, y, w, 6.6 - y, TINT.teal);
-      s.addText("CARA MENENTUKAN PRIORITAS", { x: x + 0.25, y: y + 0.2, w: w - 0.5, h: 0.3, fontSize: 12, bold: true, color: C.accent1, charSpacing: 1, margin: 0, isTextBox: true });
-      s.addText([
-        { text: "Prioritas 1: gap > Rp 250 jt dan bocor di lebih dari satu titik funnel.", options: { bullet: true, breakLine: true } },
-        { text: "Prioritas 2: satu kebocoran utama yang jelas.", options: { bullet: true, breakLine: true } },
-        { text: "Gap: TMP 379 · PML 289 · BTU 207 · HIB 197 · KWC 127 (Rp jt).", options: { bullet: true } },
-      ], { x: x + 0.25, y: y + 0.6, w: w - 0.5, h: 6.6 - y - 0.8, fontSize: 14, color: C.text1, valign: "top", margin: 0, paraSpaceAfter: 6, isTextBox: true });
-    }
+    source(s, "Prioritas 1 = gap > Rp 250 jt dan bocor di > 1 titik funnel. Gap ke Rp 600 jt: TMP 379 · PML 289 · BTU 207 · HIB 197 · KWC 127 (Rp jt).");
     s.addNotes("Prioritas 1: TMP dan PML, gap terbesar (Rp 379 jt dan Rp 289 jt) dan masalahnya di lebih dari satu titik funnel. Prioritas 2: KWC, BTU, HIB, masing-masing punya satu kebocoran utama yang jelas. KLM tetap dijaga karena volumenya juga turun.");
   }
 
@@ -489,12 +476,12 @@ async function build() {
       if (i < lev.length - 1) s.addText("×", { x: x + w, y: y + 1.3, w: gap, h: 0.5, fontSize: 20, bold: true, color: C.accent6, align: "center", valign: "middle", margin: 0, isTextBox: true });
       chip(s, st, x + 0.25, y + h - 0.02 + 0.12, w - 0.5, "dark");
     });
-    card(s, X0, 5.65, CW, 0.85, C.background2);
+    card(s, X0, 5.55, CW, 0.95, C.background2);
     s.addText([
       { text: "Revenue Rp 2,45 M → target Rp 3,6 M (+47%). ", options: { bold: true } },
-      { text: "Tidak cukup menggerakkan satu tuas: volume harus kembali mendekati Agustus, sambil CVR, pelunasan, dan ukuran paket ikut naik. Strategi 4 (kapasitas) memastikan jadwal yang dijual memang tersedia." },
-    ], { x: X0 + 0.25, y: 5.65, w: CW - 0.5, h: 0.85, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-    source(s, `Target Okt = gabungan komitmen 6 center (slide 16–21). Revenue per FP = revenue ÷ jumlah FP September (proxy ukuran paket). FP progress target = rata-rata target center, dibobot total paid.`);
+      { text: "Satu tuas tidak cukup: volume harus mendekati Agustus, sambil CVR, pelunasan, dan ukuran paket ikut naik. Strategi 4 (kapasitas) menjamin jadwal yang dijual tersedia." },
+    ], { x: X0 + 0.25, y: 5.55, w: CW - 0.5, h: 0.95, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+    source(s, "Target Okt = gabungan komitmen 6 center (slide 16–21). Revenue per FP = revenue ÷ FP Sep. FP progress = rata-rata target, bobot total paid.");
     s.addNotes(`Kerangka strategi: revenue digerakkan oleh lima tuas berurutan. September kita kuat di CVR tapi lemah di volume dan pelunasan. Target Oktober Rp 3,6 M butuh semua tuas naik: leads ke ±${id(TOT.leads)}, show-up rate 50%, CVR 45%, FP progress minimal ${FPP_T}%, dan paket yang lebih panjang supaya revenue per FP naik.`);
   }
 
@@ -522,8 +509,8 @@ async function build() {
       s.addText(d, { x: x + 0.8, y: y + 0.38, w: w - 0.8, h: 0.65, fontSize: 14, color: C.text1, margin: 0, valign: "top", isTextBox: true });
     });
     card(s, x, 6.02, w, 0.5, C.background2);
-    s.addText([{ text: "Ask ke Marketing: ", options: { bold: true } }, { text: "geser alokasi ads ke TMP (−52%) dan PML (−47%)." }], { x: x + 0.2, y: 6.02, w: w - 0.4, h: 0.5, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-    source(s, "Target leads Okt = show up yang dibutuhkan ÷ target show-up rate (lihat slide 15). Leads Agt: Center Performance Agustus 2026; Sep: Exboard › 02 Acquisition.");
+    s.addText([{ text: "Ask ke Marketing: ", options: { bold: true } }, { text: "tambah alokasi ads TMP dan PML." }], { x: x + 0.2, y: 6.02, w: w - 0.4, h: 0.5, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+    source(s, "Target leads Okt = show up yang dibutuhkan ÷ target show-up rate (slide 15). Agt: Center Performance Agustus; Sep: Exboard › 02 Acquisition.");
     s.addNotes(`Volume adalah tuas terbesar. Total leads perlu naik dari 2.016 ke sekitar ${id(TOT.leads)}, masih di bawah Agustus (3.097). Empat aksi: aktivasi lokal, referral di setiap closing, konfirmasi H-1/H-0 untuk jaga show-up rate, dan reaktivasi pool SUNP. Plus satu permintaan ke Marketing untuk geser budget ads ke TMP dan PML.`);
   }
 
@@ -539,10 +526,10 @@ async function build() {
     ];
     const rows = [[hdr("Alasan SUNP", { align: "left" }), hdr("Kasus"), hdr("Fokus center"), hdr("Jawaban & aksi SA", { align: "left" })]];
     play.forEach(([r, n, c, a]) => rows.push([cell(r, { bold: true }), cell(n, { align: "center", bold: true, color: HEX.accent1 }), cell(c, { align: "center" }), cell(a)]));
-    s.addTable(rows, { x: X0, y: 1.7, w: CW, colW: [2.6, 0.9, 1.75, 6.883], rowH: [0.42, 0.78, 0.78, 0.6, 0.6, 0.6], fontSize: 14, color: C.text1, border: { type: "solid", pt: 1, color: TINT.line }, fill: { color: "FFFFFF" }, objectName: "table-playbook" });
+    s.addTable(rows, { x: X0, y: 1.7, w: CW, colW: [2.35, 0.9, 1.6, 7.283], rowH: [0.42, 0.78, 0.78, 0.6, 0.6, 0.6], fontSize: 14, color: C.text1, border: { type: "solid", pt: 1, color: TINT.line }, fill: { color: "FFFFFF" }, objectName: "table-playbook" });
     card(s, X0, 5.95, CW, 0.6, C.background2);
-    s.addText([{ text: "Target CVR area 45% (Sep 41,4%). ", options: { bold: true } }, { text: "Alat: Pitching Script v2.0, Pricing War Battlecard, SUNP & DP Tracker. CM role-play 15 menit tiap pagi untuk SA di P3 (8 SA)." }], { x: X0 + 0.25, y: 5.95, w: CW - 0.5, h: 0.6, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-    source(s, "Jumlah kasus: Exboard › 02 Acquisition (blok SUNP per center), September 2026. P-band CVR September: P1 13 SA, P2 5 SA, P3 8 SA.");
+    s.addText([{ text: "Target CVR area 45% (Sep 41,4%). ", options: { bold: true } }, { text: "CM role-play 15 menit tiap pagi untuk 8 SA di P3." }], { x: X0 + 0.25, y: 5.95, w: CW - 0.5, h: 0.6, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+    source(s, "Alat: Pitching Script v2.0, Pricing War Battlecard, SUNP & DP Tracker. P-band CVR Sep: P1 13 · P2 5 · P3 8 SA. Sumber: Exboard 02.");
     s.addNotes("Setiap alasan SUNP punya jawaban standar. Yang paling besar dampaknya: 'diskusi keluarga' (131 kasus), bisa dicegah sejak booking dengan memastikan pengambil keputusan hadir. Untuk harga, jual value dulu baru angka; cicilan Indodana menjawab keberatan cashflow tanpa menurunkan harga. Untuk jadwal, solusinya di slot map, bukan di pitching.");
   }
 
@@ -569,20 +556,22 @@ async function build() {
     // kanan: revenue per FP chart + priority package
     const xr = X0 + wl + 0.35, wr = W - X0 - xr;
     s.addChart(pres.charts.BAR, [{ name: "Revenue per FP", labels: CENTERS, values: CENTERS.map((c) => Math.round((D[c].rev / D[c].fp) * 10) / 10) }], {
-      x: xr, y: 1.65, w: wr, h: 2.75, chartColors: CENTERS.map((c) => (D[c].isNew ? HEX.accent4 : HEX.accent1)), ...chartText(), showLegend: false,
+      x: xr, y: 1.65, w: wr, h: 2.45, chartColors: CENTERS.map((c) => (D[c].isNew ? HEX.accent4 : HEX.accent1)), ...chartText(), showLegend: false,
       valAxisHidden: true, valGridLine: { style: "none" }, valAxisMinVal: 0, valAxisMaxVal: 11, showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0.0", dataLabelFontSize: 12,
       showTitle: true, title: "Revenue per FP September (Rp jt) · center baru oranye", titleFontSize: 13, titleColor: HEX.dk1, barGapWidthPct: 50, objectName: "chart-ticket" });
-    const pk = [["Advanced 12 bulan", "Rp 9,35 jt", "6+6 bulan · cicilan Rp 896 rb/bln"], ["Basic 6 bulan", "Rp 5,32 jt", "3+3 bulan"], ["Lite 3 bulan", "Rp 4,5 jt", "starter, tanpa bonus"]];
-    s.addText("PROMO OKTOBER · PITCH DARI PAKET TERPANJANG", { x: xr, y: 4.5, w: wr, h: 0.3, fontSize: 12, bold: true, color: C.accent6, charSpacing: 1, margin: 0, isTextBox: true });
+    const pk = [["Advanced 12 bulan", "Rp 9,35 jt", "bayar 6, gratis 6 · cicilan 12× Rp 896 rb"], ["Basic 6 bulan", "Rp 5,32 jt", "bayar 3, gratis 3"], ["Lite 3 bulan", "Rp 4,5 jt", "starter, tanpa bonus"]];
+    s.addText("PROMO OKTOBER · PITCH DARI PAKET TERPANJANG", { x: xr, y: 4.15, w: wr, h: 0.3, fontSize: 12, bold: true, color: C.accent6, charSpacing: 1, margin: 0, isTextBox: true });
     pk.forEach(([n, p, d], i) => {
-      const y = 4.85 + i * 0.57;
-      card(s, xr, y, wr, 0.5, i === 0 ? TINT.teal : C.background2);
-      s.addText(`${i + 1}`, { x: xr + 0.15, y, w: 0.3, h: 0.5, fontSize: 16, bold: true, color: C.accent1, valign: "middle", margin: 0, isTextBox: true });
-      s.addText(n, { x: xr + 0.5, y, w: 2.0, h: 0.5, fontSize: 14, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-      s.addText(p, { x: xr + 2.45, y, w: 1.1, h: 0.5, fontSize: 14, bold: true, color: C.accent1, valign: "middle", margin: 0, isTextBox: true });
-      s.addText(d, { x: xr + 3.55, y, w: wr - 3.7, h: 0.5, fontSize: 12, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+      const y = 4.5 + i * 0.68;
+      card(s, xr, y, wr, 0.62, i === 0 ? TINT.teal : C.background2);
+      s.addText(`${i + 1}`, { x: xr + 0.2, y, w: 0.3, h: 0.62, fontSize: 18, bold: true, color: C.accent1, valign: "middle", margin: 0, isTextBox: true });
+      s.addText([
+        { text: n, options: { fontSize: 14, bold: true, color: C.text1, breakLine: true } },
+        { text: d, options: { fontSize: 12, color: C.accent6 } },
+      ], { x: xr + 0.6, y, w: wr - 2.2, h: 0.62, valign: "middle", margin: 0, isTextBox: true });
+      s.addText(p, { x: xr + wr - 1.6, y, w: 1.4, h: 0.62, fontSize: 16, bold: true, color: C.accent1, align: "right", valign: "middle", margin: 0, isTextBox: true });
     });
-    source(s, "Revenue per FP = revenue ÷ FP September (proxy ukuran paket). Harga: deck Priority Package & New Pitching Style (promo FP hari ini, belum termasuk uang pangkal & weekend).");
+    source(s, "Revenue per FP = revenue ÷ FP Sep. Harga: deck Priority Package (promo FP hari ini, belum termasuk uang pangkal & weekend).");
     s.addNotes("Dua hal: pelunasan dan ukuran paket. 115 murid closing dengan DP; kalau 60% lunas sebelum 20 Okt itu sekitar 69 FP tambahan. Cicilan Indodana membuat closing bisa langsung FP. Lalu ukuran paket: revenue per FP center baru Rp 4,6–5,1 jt, center matang Rp 7,4–9,0 jt. Pitch selalu mulai dari Advanced 12 bulan (Rp 9,35 jt, 6+6 gratis).");
   }
 
@@ -593,7 +582,7 @@ async function build() {
       x: X0, y: 1.65, w: 6.0, h: 3.6, chartColors: CENTERS.map((c) => (D[c].isNew ? HEX.accent4 : HEX.accent1)), ...chartText(), showLegend: false,
       valAxisMinVal: 0, valAxisMaxVal: 0.7, valAxisMajorUnit: 0.1, valAxisLabelFormatCode: "0%", showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0.0%", dataLabelFontSize: 12,
       showTitle: true, title: "Utilisasi kelas reguler (kursi terisi ÷ kapasitas)", titleFontSize: 13, titleColor: HEX.dk1, barGapWidthPct: 50, objectName: "chart-util" });
-    const st = [["Kursi kosong", id(AREA.seats)], ["Kelas dibuka, 0 murid", id(CENTERS.reduce((a, c) => a + D[c].zero, 0))], ["Utilisasi area", pct(AREA.util)]];
+    const st = [["Kursi kosong", id(AREA.seats)], ["Kelas 0 murid", id(CENTERS.reduce((a, c) => a + D[c].zero, 0))], ["Utilisasi area", pct(AREA.util)]];
     st.forEach(([l, v], i) => {
       const w = (6.0 - 0.4) / 3, x = X0 + i * (w + 0.2);
       card(s, x, 5.4, w, 1.15);
@@ -601,7 +590,7 @@ async function build() {
       s.addText(l, { x: x + 0.15, y: 6.03, w: w - 0.3, h: 0.4, fontSize: 13, color: C.accent6, margin: 0, valign: "top", isTextBox: true });
     });
     const acts = [
-      ["FaCalendarAlt", "Slot map meeting tiap Senin (CM × Senior Coach)", "Pakai working sheet mingguan: putuskan kelas 0 murid mana yang dijual minggu ini, coach PIC, dan target murid."],
+      ["FaCalendarAlt", "Slot map meeting tiap Senin", "CM × Senior Coach pakai working sheet mingguan: kelas 0 murid mana yang dijual, coach PIC, target murid."],
       ["FaClipboardCheck", "Daftar jual mingguan ke SA", "Kelas “Jual minggu ini” / “Buka kelas baru” jadi bahan pitching dan reaktivasi SUNP."],
       ["FaClock", "Jam yang diminta parents dulu", "Alasan “jadwal tidak cocok” (BTU 50 kasus) jadi input utama slot yang dibuka atau dialihkan."],
       ["FaSwimmer", "Center baru: jual slot jam favorit", "TMP, BTU, HIB masih ±10% — fokus isi jam sore & weekend sebelum membuka slot baru."],
@@ -613,7 +602,7 @@ async function build() {
       s.addText(t, { x: x + 0.8, y, w: w - 0.8, h: 0.38, fontSize: 15, bold: true, color: C.text1, margin: 0, valign: "middle", isTextBox: true });
       s.addText(d, { x: x + 0.8, y: y + 0.4, w: w - 0.8, h: 0.72, fontSize: 14, color: C.text1, margin: 0, valign: "top", isTextBox: true });
     });
-    source(s, "Sumber: Exboard › 08 Class Utilization (per 4 Okt 2026); kelas 0 murid: Slot Map Weekly Meeting W40 (data 26 Sep 2026). Center baru oranye.");
+    source(s, "Sumber: Exboard › 08 Class Utilization (per 4 Okt 2026); kelas 0 murid: Slot Map Weekly Meeting W40 (26 Sep 2026).");
     s.addNotes("Kapasitas bukan hambatan: ada 7.426 kursi kosong dan 1.105 kelas yang sudah punya age group dan coach tapi 0 murid. Masalahnya kecocokan jam. Slot map meeting tiap Senin memutuskan kelas mana yang dijual minggu itu, dan jam yang diminta parents di SUNP 'jadwal' jadi input utamanya.");
   }
 
@@ -649,7 +638,7 @@ async function build() {
       { text: "Kalau revenue per FP naik 20% ", options: { bold: true } },
       { text: `(paket 6 & 12 bulan), FP butuh turun: TMP ${PLAN.TMP.fpNeed}→${PLAN.TMP.fpNeedUp20}, BTU ${PLAN.BTU.fpNeed}→${PLAN.BTU.fpNeedUp20}, HIB ${PLAN.HIB.fpNeed}→${PLAN.HIB.fpNeedUp20}.` },
     ], { x: xs + 0.25, y: yb, w: ws - 0.5, h: 1.2, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-    source(s, "FP butuh = Rp 600 jt ÷ revenue per FP Sep · trial baru = FP butuh − 60% DP − 10% SUNP · show up butuh = trial baru ÷ (target CVR × target FP progress). Asumsi bisa direvisi.");
+    source(s, "FP butuh = 600 ÷ revenue per FP · trial baru = FP butuh − 60% DP − 10% SUNP · show up butuh = trial baru ÷ (CVR × FP progress target).");
     s.addNotes("Ini dasar draft komitmen. Langkahnya: berapa FP yang dibutuhkan untuk Rp 600 jt dengan ukuran paket September; kurangi yang bisa didapat dari pool DP (asumsi 60% lunas) dan pool SUNP (asumsi 10% closing); sisanya harus dari trial baru, dibagi target CVR dan FP progress. Hasilnya: KLM dan KWC aman dengan volume September, PML dan 3 center baru harus menaikkan show up. Kalau ukuran paket naik 20%, kebutuhan FP center baru turun sekitar 17%.");
   }
 
@@ -688,7 +677,7 @@ async function build() {
       acts: [
         ["Lunasi 35 DP lewat cash bertahap / Indodana: target 21 FP", "CM cek harian · s.d. 20 Okt"],
         ["Closing FP, bukan DP: promo FP hari ini + pitch Advanced 12 bulan dulu", "SA · mulai 6 Okt"],
-        ["Leads ke 460: aktivasi perumahan & sekolah Taman Palem, 2 event weekend; battlecard vs Studiorenang Taman Surya (2,4 km)", "CM + Marketing · W41–W42"],
+        ["Leads ke 460: aktivasi perumahan & sekolah Taman Palem + 2 event weekend", "CM + Marketing · W41–W42"],
       ],
     },
     BTU: {
@@ -726,16 +715,16 @@ async function build() {
     const tg = 0.2, tw = (CW - 5 * tg) / 6;
     snap.forEach(([l, v, sub, st], i) => {
       const x = X0 + i * (tw + tg), y = 1.82;
-      card(s, x, y, tw, 1.0);
-      s.addText(l, { x: x + 0.15, y: y + 0.08, w: tw - 0.3, h: 0.26, fontSize: 12, bold: true, color: C.accent6, margin: 0, isTextBox: true });
-      s.addText(v, { x: x + 0.15, y: y + 0.32, w: tw - 0.3, h: 0.36, fontSize: 20, bold: true, color: C.text1, margin: 0, valign: "middle", isTextBox: true });
-      chip(s, sub, x + 0.15, y + 0.66, tw - 0.3, st);
+      card(s, x, y, tw, 1.1);
+      s.addText(l, { x: x + 0.15, y: y + 0.08, w: tw - 0.3, h: 0.26, fontSize: 11, bold: true, color: C.accent6, margin: 0, isTextBox: true });
+      s.addText(v, { x: x + 0.15, y: y + 0.33, w: tw - 0.3, h: 0.38, fontSize: 18, bold: true, color: C.text1, margin: 0, valign: "middle", isTextBox: true });
+      chip(s, sub, x + 0.15, y + 0.72, tw - 0.3, st);
     });
     // Diagnosis banner
-    card(s, X0, 2.97, CW, 0.7, TINT.teal);
-    s.addText([{ text: "Diagnosis: ", options: { bold: true, color: HEX.accent1 } }, { text: pg.diag }], { x: X0 + 0.2, y: 2.97, w: CW - 0.4, h: 0.7, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+    card(s, X0, 3.04, CW, 0.7, TINT.teal);
+    s.addText([{ text: "Diagnosis: ", options: { bold: true, color: HEX.accent1 } }, { text: pg.diag }], { x: X0 + 0.2, y: 3.04, w: CW - 0.4, h: 0.7, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
     // Komitmen table
-    s.addText("DRAFT KOMITMEN OKTOBER", { x: X0, y: 3.8, w: 5.4, h: 0.28, fontSize: 12, bold: true, color: C.accent1, charSpacing: 1, margin: 0, isTextBox: true });
+    s.addText("DRAFT KOMITMEN OKTOBER", { x: X0, y: 3.85, w: 5.4, h: 0.28, fontSize: 12, bold: true, color: C.accent1, charSpacing: 1, margin: 0, isTextBox: true });
     const rows = [[hdr("KPI", { align: "left" }), hdr("Sep"), hdr("Target Okt")]];
     const tRow = (k, a, b) => [cell(k, { bold: true }), cell(a, { align: "center" }), cell(b, { align: "center", bold: true, color: HEX.accent1, fill: { color: TINT.teal } })];
     rows.push(tRow("Leads", id(d.leads), id(p.leadsCommit)));
@@ -744,19 +733,19 @@ async function build() {
     rows.push(tRow("FP progress", pct(d.fpp), `${g.fpp}%`));
     rows.push(tRow("Full payment", id(d.fp), `≥ ${id(p.fpCommit)}`));
     rows.push(tRow("Revenue (Rp jt)", id(d.rev), `≥ ${TARGET}`));
-    s.addTable(rows, { x: X0, y: 4.1, w: 5.4, colW: [2.2, 1.5, 1.7], rowH: [0.34, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35], fontSize: 14, color: C.text1, border: { type: "solid", pt: 1, color: TINT.line }, fill: { color: "FFFFFF" }, objectName: `table-commit-${c}` });
+    s.addTable(rows, { x: X0, y: 4.15, w: 5.4, colW: [2.2, 1.5, 1.7], rowH: [0.34, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35], fontSize: 14, color: C.text1, border: { type: "solid", pt: 1, color: TINT.line }, fill: { color: "FFFFFF" }, objectName: `table-commit-${c}` });
     // Aksi
     const xr = X0 + 5.75, wr = W - X0 - xr;
-    s.addText("3 AKSI UTAMA", { x: xr, y: 3.8, w: wr, h: 0.28, fontSize: 12, bold: true, color: C.accent1, charSpacing: 1, margin: 0, isTextBox: true });
+    s.addText("3 AKSI UTAMA", { x: xr, y: 3.85, w: wr, h: 0.28, fontSize: 12, bold: true, color: C.accent1, charSpacing: 1, margin: 0, isTextBox: true });
     pg.acts.forEach(([a, who], i) => {
-      const y = 4.1 + i * 0.82;
+      const y = 4.15 + i * 0.8;
       s.addText(String(i + 1), { x: xr, y: y + 0.02, w: 0.36, h: 0.36, fontSize: 14, bold: true, color: C.background1, align: "center", valign: "middle", margin: 0, isTextBox: true, shape: pres.shapes.OVAL, fill: { color: C.accent1 }, line: { type: "none" } });
       s.addText([
         { text: a, options: { fontSize: 14, color: C.text1, breakLine: true } },
         { text: who, options: { fontSize: 12, color: C.accent6, bold: true } },
       ], { x: xr + 0.5, y, w: wr - 0.5, h: 0.76, valign: "top", margin: 0, isTextBox: true });
     });
-    source(s, `Target Okt dari model slide 15: show up = max(kebutuhan ${p.suNeed}, Sep ${d.su}); leads = show up ÷ show-up rate ${g.sur}% (min. leads Sep); dibulatkan ke 5. Revenue ≥ Rp 600 jt = target Oktober.`);
+    source(s, `Model slide 15: show up = max(kebutuhan ${p.suNeed}, Sep ${d.su}); leads = show up ÷ show-up rate ${g.sur}%, min. leads Sep; bulat ke 5.`);
     s.addNotes(`${c} (${d.name}). September: revenue Rp ${id(d.rev)} jt (${pctTarget(c)}% target), show up ${d.su}, CVR ${pct(d.cvr)}, FP progress ${pct(d.fpp)}, ${d.dp} DP belum lunas, ${d.sunp} SUNP. Draft komitmen Oktober: leads ${p.leadsCommit}, show up ${p.suCommit}, CVR ${g.cvr}%, FP progress ${g.fpp}%, FP minimal ${p.fpCommit}, revenue minimal Rp 600 jt. Minta CM konfirmasi atau revisi angka dan PIC tiap aksi di meeting.`);
   }
 
@@ -771,8 +760,8 @@ async function build() {
     rows.push([cell("Area", { bold: true, fill: { color: TINT.teal }, fontSize: 15 }), cell(id(TOT.leads), { align: "center", bold: true, fill: { color: TINT.teal } }), cell(id(TOT.su), { align: "center", bold: true, fill: { color: TINT.teal } }), cell("45%", { align: "center", bold: true, fill: { color: TINT.teal } }), cell(`≥ ${FPP_T}%`, { align: "center", bold: true, fill: { color: TINT.teal } }), cell(`≥ ${id(TOT.fp)}`, { align: "center", bold: true, fill: { color: TINT.teal } }), cell(`≥ ${id(TARGET * 6)}`, { align: "center", bold: true, color: HEX.accent1, fill: { color: TINT.teal } }), cell("", { fill: { color: TINT.teal } })]);
     s.addTable(rows, { x: X0, y: 1.7, w: CW, colW: [1.2, 1.35, 1.35, 1.2, 1.5, 1.6, 1.8, 2.133], rowH: 0.52, fontSize: 14, color: C.text1, border: { type: "solid", pt: 1, color: TINT.line }, fill: { color: "F4F8F9" }, objectName: "table-summary" });
     card(s, X0, 5.95, CW, 0.6, C.background2);
-    s.addText([{ text: "Dibanding September: ", options: { bold: true } }, { text: `leads +${Math.round(chg(TOT.leads, AREA.leads))}%, show up +${Math.round(chg(TOT.su, AREA.su))}%, full payment +${Math.round(chg(TOT.fp, AREA.fp))}%, revenue +${Math.round(chg(TARGET * 6, AREA.rev))}%. Kolom konfirmasi diisi CM di meeting.` }], { x: X0 + 0.25, y: 5.95, w: CW - 0.5, h: 0.6, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
-    source(s, "Area CVR dan FP progress = target minimum area; target per center di kolom masing-masing. Revenue target Oktober Rp 600 jt per center (total Rp 3,6 M).");
+    s.addText([{ text: "Dibanding September: ", options: { bold: true } }, { text: `leads +${Math.round(chg(TOT.leads, AREA.leads))}%, show up +${Math.round(chg(TOT.su, AREA.su))}%, full payment +${Math.round(chg(TOT.fp, AREA.fp))}%, revenue +${Math.round(chg(TARGET * 6, AREA.rev))}%.` }], { x: X0 + 0.25, y: 5.95, w: CW - 0.5, h: 0.6, fontSize: 14, color: C.text1, valign: "middle", margin: 0, isTextBox: true });
+    source(s, "Kolom konfirmasi diisi CM di meeting. Baris Area: CVR dan FP progress = target minimum area. Target revenue Rp 600 jt per center.");
     s.addNotes(`Ringkasan seluruh draft komitmen dalam satu tabel. Di meeting, tiap CM menyatakan setuju atau mengusulkan revisi, lalu kolom konfirmasi diisi. Total: leads sekitar ${id(TOT.leads)}, show up ${id(TOT.su)}, FP minimal ${id(TOT.fp)}, revenue Rp 3,6 M.`);
   }
 
@@ -820,15 +809,15 @@ async function build() {
     const gap = 0.3, w = (CW - 3 * gap) / 4;
     pts.forEach(([ic, t, d], i) => {
       const x = X0 + i * (w + gap), y = 3.0;
-      s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y, w, h: 2.0, fill: { color: "134C5A" }, line: { type: "none" }, rectRadius: 0.12, objectName: oname("card-dark") });
+      s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y, w, h: 2.35, fill: { color: "134C5A" }, line: { type: "none" }, rectRadius: 0.12, objectName: oname("card-dark") });
       iconDot(s, ic, x + 0.25, y + 0.25, 0.6, C.accent2);
       s.addText(t, { x: x + 0.25, y: y + 0.95, w: w - 0.5, h: 0.4, fontSize: 18, bold: true, color: C.background1, margin: 0, valign: "middle", isTextBox: true });
-      s.addText(d, { x: x + 0.25, y: y + 1.35, w: w - 0.5, h: 0.6, fontSize: 14, color: C.background2, margin: 0, valign: "top", isTextBox: true });
+      s.addText(d, { x: x + 0.25, y: y + 1.35, w: w - 0.5, h: 0.9, fontSize: 14, color: C.background2, margin: 0, valign: "top", isTextBox: true });
     });
     s.addText([
       { text: "Langkah berikutnya: ", options: { bold: true, color: C.accent2 } },
       { text: "CM konfirmasi angka & PIC aksi paling lambat H+1 setelah meeting. Checkpoint pertama 15 Oktober.", options: { color: C.background1 } },
-    ], { x: X0, y: 5.5, w: CW, h: 0.6, fontSize: 16, valign: "middle", margin: 0, isTextBox: true });
+    ], { x: X0, y: 5.7, w: CW, h: 0.75, fontSize: 16, valign: "middle", margin: 0, isTextBox: true });
     s.addNotes("Penutup. Satu target: Rp 3,6 M, Rp 600 jt per center. Empat strategi: volume, closing, cash & ticket, kapasitas. Langkah berikutnya: CM konfirmasi komitmen H+1, checkpoint 15 Oktober.");
   }
 

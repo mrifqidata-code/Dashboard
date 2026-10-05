@@ -5,6 +5,9 @@ Deck meeting bulanan Area Manager × Center Manager.
 - `Monthly_Review_September_2026_CM.pptx` — review September 2026 dan draft komitmen Oktober (24 slide, ada speaker notes).
 - `build_deck.js` — generator (pptxgenjs). Semua angka ada di blok `DATA` di awal file.
 
+Font: **Poppins** (diset di tema). Google Slides sudah punya Poppins. Untuk PowerPoint, install Poppins dulu
+(gratis di Google Fonts); kalau tidak terpasang, PowerPoint mengganti dengan font lain dan layout bisa bergeser.
+
 Alur deck:
 1. Apa yang terjadi di September: revenue vs target, funnel, alasan SUNP, highlight.
 2. Center yang perlu improvement: scorecard dan prioritas.
