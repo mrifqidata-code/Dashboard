@@ -36,6 +36,23 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+// API untuk halaman Kelas → Student di app (GitHub Pages). App mengirim POST tanpa akun Google:
+// body JSON {action: 'verify' | 'search' | 'detail', pin, q, name, center}; balasan JSON {ok, data} / {ok: false, error}.
+function doPost(e) {
+  let out;
+  try {
+    const b = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const data = b.action === 'verify' ? verify(b.pin)
+      : b.action === 'search' ? search(b.q, b.pin)
+      : b.action === 'detail' ? detail(b.name, b.center, b.pin)
+      : (() => { throw new Error('Aksi tidak dikenal'); })();
+    out = {ok: true, data};
+  } catch (err) {
+    out = {ok: false, error: String(err && err.message || err)};
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 const norm_ = s => String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
 
 function sheetInfo_(name) {

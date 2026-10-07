@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Student</title>
+<meta name="description" content="Cari murid dan lihat data dari Student Database & Student Management (dengan PIN).">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../assets/shell.css">
+<link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body class="cat-kelas">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 4v16M16 4v16"/></svg></div>
+    <div class="brand">
+      <h1>Student</h1>
+      <p id="sub">Kelas</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('kelas-student');
+// Data murid tidak lewat feed publik: app bertanya ke web app Apps Script di Exboard (docs/student/Code.gs),
+// yang hanya membalas bila PIN benar. Dikirim tanpa akun Google (credentials: omit), jadi tidak terpengaruh
+// banyaknya akun Google yang login di HP.
+const API = 'https://script.google.com/macros/s/AKfycbzHc-PlOTKY5QIqG78-P9EgC9dVjeC2qNW-gdSApZy9XK0mV-I9FTgnMv8pv0LdgUUjGQ/exec';
+const PIN_KEY = 'dashboardApp.studentPin';
+['#cChips', '#status', '#foot'].forEach(s => { const el = $(s); if (el) el.hidden = true; });
+let pin = DA.lsGet(PIN_KEY) || '', timer = null, seq = 0;
+
+async function api(action, body){
+  let res;
+  try { res = await fetch(API, {method: 'POST', credentials: 'omit', redirect: 'follow', body: JSON.stringify({action, pin, ...body})}); }
+  catch (e) { throw new Error(navigator.onLine ? 'Tidak bisa menghubungi Apps Script.' : 'HP sedang offline.'); }
+  let j; try { j = await res.json(); } catch (e) { throw new Error('Balasan Apps Script tidak terbaca. Pastikan deployment versi terbaru dengan akses "Anyone".'); }
+  if (!j.ok) throw new Error(j.error || 'Gagal');
+  return j.data;
+}
+const isPinErr = e => /PIN_SALAH/.test(String(e && e.message));
+
+$('#view').innerHTML = `
+  <form class="stu-pin card" id="pinBox" hidden>
+    <h3>Masukkan PIN</h3>
+    <p class="note" style="margin:0 0 12px">Data murid hanya tampil setelah PIN benar. PIN diingat di HP ini.</p>
+    <input class="stu-input stu-pin-input" id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN">
+    <button class="btn stu-go" id="pinBtn" type="submit">Buka</button>
+    <p class="note" id="pinMsg"></p>
+  </form>
+  <div id="app" hidden>
+    <div class="stu-bar">
+      <input class="stu-input" id="q" type="search" placeholder="Ketik nama anak…" autocomplete="off" aria-label="Cari nama anak">
+      <button class="btn" id="lockBtn" type="button" title="Lupakan PIN di HP ini">Kunci</button>
+    </div>
+    <p class="note" id="hint">Ketik minimal 2 huruf, lalu pilih nama dari daftar.</p>
+    <div class="stu-sugg" id="sugg"></div>
+    <div id="out"></div>
+  </div>`;
+$('#pullBtn').hidden = true;
+
+function askPin(msg){
+  pin = ''; DA.lsSet(PIN_KEY, '');
+  $('#app').hidden = true; $('#pinBox').hidden = false;
+  $('#pinMsg').textContent = msg || ''; $('#pin').value = ''; $('#pin').focus();
+}
+function showApp(){ $('#pinBox').hidden = true; $('#app').hidden = false; }
+function fail(e){
+  if (isPinErr(e)) return askPin('PIN tidak cocok. Masukkan lagi.');
+  $('#out').innerHTML = `<div class="notice">${esc(e.message)}</div>`;
+}
+
+$('#pinBox').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const v = $('#pin').value.trim(); if (!v) return;
+  $('#pinBtn').disabled = true; $('#pinMsg').textContent = 'Memeriksa…';
+  pin = v;
+  try { await api('verify'); DA.lsSet(PIN_KEY, v); showApp(); $('#q').focus(); }
+  catch (e) { pin = ''; $('#pinMsg').textContent = isPinErr(e) ? 'PIN tidak cocok.' : e.message; }
+  finally { $('#pinBtn').disabled = false; }
+});
+$('#lockBtn').addEventListener('click', () => { $('#out').innerHTML = ''; $('#sugg').innerHTML = ''; $('#q').value = ''; askPin('Terkunci. Masukkan PIN untuk membuka lagi.'); });
+
+$('#q').addEventListener('input', () => {
+  clearTimeout(timer);
+  const q = $('#q').value.trim();
+  if (q.length < 2){ $('#sugg').innerHTML = ''; $('#hint').textContent = 'Ketik minimal 2 huruf, lalu pilih nama dari daftar.'; return; }
+  timer = setTimeout(async () => {
+    const my = ++seq;
+    $('#hint').textContent = 'Mencari…';
+    try {
+      const res = await api('search', {q});
+      if (my !== seq) return;
+      const items = res.items || [];
+      $('#hint').textContent = items.length ? `${items.length}${res.more ? '+' : ''} nama cocok${res.more ? ` (perjelas ketikan untuk ${res.more} lainnya)` : ''}.` : 'Tidak ada nama yang cocok.';
+      $('#sugg').innerHTML = items.map((e, i) => {
+        const where = Object.entries(e.hits).map(([s, n]) => `${s.replace('Student ', '')}${n > 1 ? ' ×' + n : ''}`).join(' · ');
+        return `<button type="button" data-i="${i}"><span class="stu-nm">${esc(e.n)}</span>${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}<span class="stu-meta">${esc(where)}</span></button>`;
+      }).join('');
+      $('#sugg').onclick = ev => { const b = ev.target.closest('button[data-i]'); if (b) openStudent(items[Number(b.dataset.i)]); };
+    } catch (e) { if (my === seq){ $('#hint').textContent = ''; fail(e); } }
+  }, 300);
+});
+
+async function openStudent(e){
+  $('#sugg').innerHTML = ''; $('#hint').textContent = '';
+  $('#out').innerHTML = `<p class="note">Memuat data ${esc(e.n)}…</p>`;
+  try {
+    const parts = await api('detail', {name: e.n, center: e.c});
+    let html = `<div class="sec-head"><h2>${esc(e.n)} ${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}</h2></div>`;
+    parts.forEach(p => {
+      html += `<div class="card stu-card"><h3>${esc(p.src)}${p.rows.length > 1 ? ` <span class="chip">${p.rows.length} baris</span>` : ''}</h3>`;
+      if (p.missing) html += '<p class="note">Tab atau kolom nama tidak ditemukan.</p>';
+      else if (!p.rows.length) html += '<p class="note">Tidak ada data dengan nama ini.</p>';
+      p.rows.forEach((r, i) => {
+        if (p.rows.length > 1) html += `<div class="stu-rowlab">Baris ${i + 1}</div>`;
+        html += '<dl class="stu-dl">' + p.head.map((h, j) => (h && String(r[j]).trim()) ? `<dt>${esc(h)}</dt><dd>${esc(r[j])}</dd>` : '').join('') + '</dl>';
+      });
+      html += '</div>';
+    });
+    $('#out').innerHTML = html;
+  } catch (err) { fail(err); }
+}
+
+// PIN tersimpan tetap dicek ulang ke server sebelum pencarian dibuka
+if (pin) api('verify').then(showApp, e => askPin(isPinErr(e) ? '' : e.message));
+else askPin();
+})();
+</script>
+</body>
+</html>

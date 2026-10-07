@@ -135,3 +135,23 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .foot{font-size:12.5px;color:var(--muted);margin:24px 0 8px;display:grid;gap:4px}
 .foot a{color:var(--accent)}
 @media (prefers-reduced-motion: reduce){ .skel,.btn.spin svg{animation:none} }
+
+/* Halaman Student (Kelas): PIN, kotak cari, saran nama, detail kolom */
+.stu-pin{max-width:380px;margin:12px auto 0;text-align:center}
+.stu-input{width:100%;min-height:46px;border:1px solid var(--border-2);border-radius:12px;background:var(--surface);color:inherit;font:inherit;font-size:16px;padding:10px 14px;min-width:0}
+.stu-input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.stu-pin-input{text-align:center;letter-spacing:.3em;font-size:20px}
+.stu-go{width:100%;margin-top:10px;background:var(--accent);color:var(--accent-ink,#fff);border-color:transparent}
+.stu-bar{display:flex;gap:8px;align-items:center}
+.stu-bar .btn{flex:none;min-height:46px}
+.stu-sugg{display:grid;gap:6px;margin-top:10px}
+.stu-sugg button{display:flex;align-items:center;gap:8px;text-align:left;width:100%;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;font:inherit;color:inherit;cursor:pointer}
+.stu-sugg button:hover,.stu-sugg button:focus-visible{border-color:var(--accent);outline:none}
+.stu-nm{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stu-meta{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.stu-card{margin-top:12px}
+.stu-rowlab{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
+.stu-dl{display:grid;grid-template-columns:minmax(0,38%) minmax(0,1fr);gap:6px 12px;margin:0;font-size:14px}
+.stu-dl dt{color:var(--ink-2);overflow-wrap:anywhere}
+.stu-dl dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+[hidden]{display:none !important}

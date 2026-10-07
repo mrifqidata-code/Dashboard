@@ -25,7 +25,7 @@ const NAV = [
     {id:'kelas', label:'Slot Map', href:'kelas/'},
     {id:'kelas-utilisasi', label:'Utilisasi', href:'kelas/utilisasi/'},
     {id:'kelas-coach', label:'Coach', href:'kelas/coach/'},
-    {id:'kelas-student', label:'Student', href:'https://script.google.com/macros/s/AKfycbzHc-PlOTKY5QIqG78-P9EgC9dVjeC2qNW-gdSApZy9XK0mV-I9FTgnMv8pv0LdgUUjGQ/exec'}]}
+    {id:'kelas-student', label:'Student', href:'kelas/student/'}]}
 ];
 
 /* ---------- Utilitas ---------- */
