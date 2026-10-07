@@ -57,18 +57,33 @@ const PIN_KEY = 'dashboardApp.studentPin';
 ['#cChips', '#status', '#foot'].forEach(s => { const el = $(s); if (el) el.hidden = true; });
 let pin = DA.lsGet(PIN_KEY) || '', timer = null, names = null;
 // Daftar nama (tanpa data lain) disimpan hanya selama app terbuka (sessionStorage), supaya pencarian langsung di HP
-const LIST_KEY = 'dashboardApp.studentList';
+const LIST_KEY = 'dashboardApp.studentList.v2';
 const ssGet = () => { try { return JSON.parse(sessionStorage.getItem(LIST_KEY) || 'null'); } catch (e) { return null; } };
 const ssSet = v => { try { v ? sessionStorage.setItem(LIST_KEY, JSON.stringify(v)) : sessionStorage.removeItem(LIST_KEY); } catch (e) {} };
 const norm = s => String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
 function useList(data){
-  names = data.rows.map(r => ({n: r[0], c: r[1], k: norm(r[0]), hits: Object.fromEntries(data.sources.map((s, i) => [s, r[2 + i]]).filter(x => x[1]))}));
+  const S = data.sources.length;
+  names = data.rows.map(r => ({n: r[0], c: r[1], k: norm(r[0]), hits: Object.fromEntries(data.sources.map((s, i) => [s, r[2 + i]]).filter(x => x[1])),
+    st: r[2 + S] || '', cy: r[3 + S] || ''}));
+  drawFilters();
 }
+// Sub-tab Status (Full / Regis Only, dari Student Database) dan Cycle (C1/C2/…, dari Student ID Student Management)
+const ST_KEY = 'dashboardApp.studentStatus', CY_KEY = 'dashboardApp.studentCycle';
+let fSt = 'ALL', fCy = 'ALL';
+function drawFilters(){
+  const sts = [...new Set(names.map(e => e.st).filter(Boolean))].sort((a, b) => (b==='Full') - (a==='Full') || a.localeCompare(b));
+  const cys = [...new Set(names.map(e => e.cy).filter(Boolean))].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  $('#fSt').hidden = !sts.length; $('#fCy').hidden = !cys.length;
+  fSt = sts.length ? R.pickChips($('#fSt'), sts, ST_KEY, {all: 'Semua status', aria: 'Pilih status'}, () => { drawFilters(); runSearch(); }) : 'ALL';
+  fCy = cys.length ? R.pickChips($('#fCy'), cys, CY_KEY, {all: 'Semua cycle', aria: 'Pilih cycle'}, () => { drawFilters(); runSearch(); }) : 'ALL';
+}
+const inFilter = e => (fSt === 'ALL' || e.st === fSt) && (fCy === 'ALL' || e.cy === fCy);
+const filterLabel = () => [fSt === 'ALL' ? '' : fSt, fCy === 'ALL' ? '' : fCy].filter(Boolean).join(' · ');
 async function loadList(){
   $('#hint').textContent = 'Memuat daftar nama…';
   const data = await api('list');
   ssSet(data); useList(data);
-  $('#hint').textContent = `${names.length.toLocaleString('id-ID')} nama siap dicari. Ketik minimal 2 huruf.`;
+  runSearch();
 }
 
 async function api(action, body){
@@ -94,6 +109,8 @@ $('#view').innerHTML = `
       <input class="stu-input" id="q" type="search" placeholder="Ketik nama anak…" autocomplete="off" aria-label="Cari nama anak">
       <button class="btn" id="lockBtn" type="button" title="Lupakan PIN di HP ini">Kunci</button>
     </div>
+    <div class="cbar stu-f" id="fSt" hidden></div>
+    <div class="cbar stu-f" id="fCy" hidden></div>
     <p class="note" id="hint">Ketik minimal 2 huruf, lalu pilih nama dari daftar.</p>
     <div class="stu-sugg" id="sugg"></div>
     <div id="out"></div>
@@ -128,14 +145,15 @@ async function loadListAfterPin(){ $('#pinMsg').textContent = 'Memuat daftar nam
 function runSearch(){
   const q = norm($('#q').value);
   if (!names) return;
-  if (q.length < 2){ $('#sugg').innerHTML = ''; $('#hint').textContent = `${names.length.toLocaleString('id-ID')} nama siap dicari. Ketik minimal 2 huruf.`; return; }
+  const base = names.filter(inFilter), lab = filterLabel();
+  if (q.length < 2){ $('#sugg').innerHTML = ''; $('#hint').textContent = `${base.length.toLocaleString('id-ID')} murid${lab ? ' · ' + lab : ''}. Ketik minimal 2 huruf nama.`; return; }
   const words = q.split(' ');
-  const hits = names.filter(e => words.every(w => e.k.includes(w)));
+  const hits = base.filter(e => words.every(w => e.k.includes(w)));
   hits.sort((a, b) => (b.k.startsWith(words[0]) - a.k.startsWith(words[0])) || a.n.localeCompare(b.n));
   const items = hits.slice(0, 15), more = hits.length - items.length;
-  $('#hint').textContent = items.length ? `${hits.length} nama cocok${more ? ' (perjelas ketikan untuk mempersempit)' : ''}.` : 'Tidak ada nama yang cocok.';
+  $('#hint').textContent = items.length ? `${hits.length} nama cocok${lab ? ' · ' + lab : ''}${more ? ' (perjelas ketikan untuk mempersempit)' : ''}.` : `Tidak ada nama yang cocok${lab ? ' untuk ' + lab : ''}.`;
   $('#sugg').innerHTML = items.map((e, i) => {
-    const where = Object.entries(e.hits).map(([s, n]) => `${s.replace('Student ', '')}${n > 1 ? ' ×' + n : ''}`).join(' · ');
+    const where = [e.st, e.cy].filter(Boolean).join(' · ') || Object.keys(e.hits).map(s => s.replace('Student ', '')).join(' · ');
     return `<button type="button" data-i="${i}"><span class="stu-nm">${esc(e.n)}</span>${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}<span class="stu-meta">${esc(where)}</span></button>`;
   }).join('');
   $('#sugg').onclick = ev => { const bt = ev.target.closest('button[data-i]'); if (bt) openStudent(items[Number(bt.dataset.i)]); };

@@ -21,6 +21,10 @@ const HIDE = {
     'Next Schedule (yyyy-mm-dd)', "Child's Nickname", 'Main Phone Number', 'Unique Key + Name (copy-paste ke kolom B Attendance Log)',
     'Last attendance log', 'Actual last class']
 };
+// Filter di halaman Student: Status (Full / Regis Only) dari kolom "Status" Student Database (baris terbaru),
+// Cycle (C1/C2/…) dari akhiran Student ID di Student Management (cycle tertinggi).
+const STATUS_COL = {src: 'Student Database', re: /^[\s*]*status\s*$/i};
+const CYCLE_COL = {src: 'Student Management', re: /student\s*id/i};
 const hkey_ = h => String(h || '').replace(/[\u2018\u2019`]/g, "'").replace(/[*]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 const MAX_SUGGEST = 15;
 const MAX_FAIL = 10, LOCK_SEC = 900;   // 10 PIN salah dalam 15 menit → semua percobaan dikunci 15 menit
@@ -91,27 +95,32 @@ function buildIndex_() {
     if (!info || info.nameIdx < 0 || info.lastRow < 2) return;
     const names = info.sh.getRange(2, info.nameIdx + 1, info.lastRow - 1, 1).getValues();
     const centers = info.centerIdx >= 0 ? info.sh.getRange(2, info.centerIdx + 1, info.lastRow - 1, 1).getValues() : null;
+    const extraCol = (cfg) => { if (cfg.src !== src) return null; const j = info.head.findIndex(h => cfg.re.test(h)); return j < 0 ? null : info.sh.getRange(2, j + 1, info.lastRow - 1, 1).getDisplayValues(); };
+    const stat = extraCol(STATUS_COL), sid = extraCol(CYCLE_COL);
     names.forEach((r, i) => {
       const n = String(r[0]).trim(); if (!n) return;
       const c = centers ? String(centers[i][0]).trim().toUpperCase() : '';
       const k = norm_(n) + '|' + c;
       const e = idx[k] || (idx[k] = {n, c, r: {}});
       (e.r[src] || (e.r[src] = [])).push(i + 2);
+      if (stat && String(stat[i][0]).trim()) e.st = String(stat[i][0]).trim();          // baris terbawah = terbaru
+      const m = sid && /-\s*C\s*(\d+)\s*$/i.exec(String(sid[i][0]));
+      if (m) e.cy = Math.max(e.cy || 0, Number(m[1]));
     });
   });
   const out = {entries: Object.values(idx), at: Date.now()};
   const cache = CacheService.getScriptCache(), txt = JSON.stringify(out), size = 90000, put = {};
   let n = 0;
-  for (; n * size < txt.length; n++) put['idx:' + n] = txt.slice(n * size, (n + 1) * size);
-  put['idx:n'] = String(n);
+  for (; n * size < txt.length; n++) put['idx2:' + n] = txt.slice(n * size, (n + 1) * size);
+  put['idx2:n'] = String(n);
   try { cache.putAll(put, IDX_SEC); } catch (e) {}
   return out;
 }
 
 function index_() {
-  const cache = CacheService.getScriptCache(), meta = cache.get('idx:n');
+  const cache = CacheService.getScriptCache(), meta = cache.get('idx2:n');
   if (meta) {
-    const keys = Array.from({length: Number(meta)}, (_, i) => 'idx:' + i), parts = cache.getAll(keys);
+    const keys = Array.from({length: Number(meta)}, (_, i) => 'idx2:' + i), parts = cache.getAll(keys);
     if (keys.every(k => parts[k] != null)) return JSON.parse(keys.map(k => parts[k]).join(''));
   }
   return buildIndex_();
@@ -125,7 +134,8 @@ const hitsOf_ = e => Object.fromEntries(Object.entries(e.r).map(([s, rows]) => [
 // Daftar semua nama (untuk pencarian langsung di HP): [nama, center, jumlah baris per tab]
 function list(pin) {
   checkPin_(pin);
-  return {sources: SOURCES, rows: index_().entries.map(e => [e.n, e.c].concat(SOURCES.map(s => (e.r[s] || []).length)))};
+  // baris: [nama, center, jumlah baris per tab…, status, cycle]
+  return {sources: SOURCES, rows: index_().entries.map(e => [e.n, e.c].concat(SOURCES.map(s => (e.r[s] || []).length), [e.st || '', e.cy ? 'C' + e.cy : '']))};
 }
 
 // Saran nama (dipakai Index.html): semua kata yang diketik harus ada di nama

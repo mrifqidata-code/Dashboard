@@ -155,3 +155,4 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .stu-dl dt{color:var(--ink-2);overflow-wrap:anywhere}
 .stu-dl dd{margin:0;font-weight:600;overflow-wrap:anywhere}
 [hidden]{display:none !important}
+.stu-f{margin:10px 0 0}
