@@ -55,7 +55,21 @@ DA.mountNav('kelas-student');
 const API = 'https://script.google.com/macros/s/AKfycbzHc-PlOTKY5QIqG78-P9EgC9dVjeC2qNW-gdSApZy9XK0mV-I9FTgnMv8pv0LdgUUjGQ/exec';
 const PIN_KEY = 'dashboardApp.studentPin';
 ['#cChips', '#status', '#foot'].forEach(s => { const el = $(s); if (el) el.hidden = true; });
-let pin = DA.lsGet(PIN_KEY) || '', timer = null, seq = 0;
+let pin = DA.lsGet(PIN_KEY) || '', timer = null, names = null;
+// Daftar nama (tanpa data lain) disimpan hanya selama app terbuka (sessionStorage), supaya pencarian langsung di HP
+const LIST_KEY = 'dashboardApp.studentList';
+const ssGet = () => { try { return JSON.parse(sessionStorage.getItem(LIST_KEY) || 'null'); } catch (e) { return null; } };
+const ssSet = v => { try { v ? sessionStorage.setItem(LIST_KEY, JSON.stringify(v)) : sessionStorage.removeItem(LIST_KEY); } catch (e) {} };
+const norm = s => String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
+function useList(data){
+  names = data.rows.map(r => ({n: r[0], c: r[1], k: norm(r[0]), hits: Object.fromEntries(data.sources.map((s, i) => [s, r[2 + i]]).filter(x => x[1]))}));
+}
+async function loadList(){
+  $('#hint').textContent = 'Memuat daftar nama…';
+  const data = await api('list');
+  ssSet(data); useList(data);
+  $('#hint').textContent = `${names.length.toLocaleString('id-ID')} nama siap dicari. Ketik minimal 2 huruf.`;
+}
 
 async function api(action, body){
   let res;
@@ -87,7 +101,7 @@ $('#view').innerHTML = `
 $('#pullBtn').hidden = true;
 
 function askPin(msg){
-  pin = ''; DA.lsSet(PIN_KEY, '');
+  pin = ''; DA.lsSet(PIN_KEY, ''); ssSet(null); names = null;
   $('#app').hidden = true; $('#pinBox').hidden = false;
   $('#pinMsg').textContent = msg || ''; $('#pin').value = ''; $('#pin').focus();
 }
@@ -102,38 +116,38 @@ $('#pinBox').addEventListener('submit', async ev => {
   const v = $('#pin').value.trim(); if (!v) return;
   $('#pinBtn').disabled = true; $('#pinMsg').textContent = 'Memeriksa…';
   pin = v;
-  try { await api('verify'); DA.lsSet(PIN_KEY, v); showApp(); $('#q').focus(); }
+  try { await loadListAfterPin(); DA.lsSet(PIN_KEY, v); }
   catch (e) { pin = ''; $('#pinMsg').textContent = isPinErr(e) ? 'PIN tidak cocok.' : e.message; }
   finally { $('#pinBtn').disabled = false; }
 });
 $('#lockBtn').addEventListener('click', () => { $('#out').innerHTML = ''; $('#sugg').innerHTML = ''; $('#q').value = ''; askPin('Terkunci. Masukkan PIN untuk membuka lagi.'); });
 
-$('#q').addEventListener('input', () => {
-  clearTimeout(timer);
-  const q = $('#q').value.trim();
-  if (q.length < 2){ $('#sugg').innerHTML = ''; $('#hint').textContent = 'Ketik minimal 2 huruf, lalu pilih nama dari daftar.'; return; }
-  timer = setTimeout(async () => {
-    const my = ++seq;
-    $('#hint').textContent = 'Mencari…';
-    try {
-      const res = await api('search', {q});
-      if (my !== seq) return;
-      const items = res.items || [];
-      $('#hint').textContent = items.length ? `${items.length}${res.more ? '+' : ''} nama cocok${res.more ? ` (perjelas ketikan untuk ${res.more} lainnya)` : ''}.` : 'Tidak ada nama yang cocok.';
-      $('#sugg').innerHTML = items.map((e, i) => {
-        const where = Object.entries(e.hits).map(([s, n]) => `${s.replace('Student ', '')}${n > 1 ? ' ×' + n : ''}`).join(' · ');
-        return `<button type="button" data-i="${i}"><span class="stu-nm">${esc(e.n)}</span>${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}<span class="stu-meta">${esc(where)}</span></button>`;
-      }).join('');
-      $('#sugg').onclick = ev => { const b = ev.target.closest('button[data-i]'); if (b) openStudent(items[Number(b.dataset.i)]); };
-    } catch (e) { if (my === seq){ $('#hint').textContent = ''; fail(e); } }
-  }, 300);
-});
+async function loadListAfterPin(){ $('#pinMsg').textContent = 'Memuat daftar nama…'; await loadList(); showApp(); $('#q').focus(); }
+
+// Pencarian di HP: semua kata yang diketik harus ada di nama; yang diawali kata pertama tampil lebih dulu
+function runSearch(){
+  const q = norm($('#q').value);
+  if (!names) return;
+  if (q.length < 2){ $('#sugg').innerHTML = ''; $('#hint').textContent = `${names.length.toLocaleString('id-ID')} nama siap dicari. Ketik minimal 2 huruf.`; return; }
+  const words = q.split(' ');
+  const hits = names.filter(e => words.every(w => e.k.includes(w)));
+  hits.sort((a, b) => (b.k.startsWith(words[0]) - a.k.startsWith(words[0])) || a.n.localeCompare(b.n));
+  const items = hits.slice(0, 15), more = hits.length - items.length;
+  $('#hint').textContent = items.length ? `${hits.length} nama cocok${more ? ' (perjelas ketikan untuk mempersempit)' : ''}.` : 'Tidak ada nama yang cocok.';
+  $('#sugg').innerHTML = items.map((e, i) => {
+    const where = Object.entries(e.hits).map(([s, n]) => `${s.replace('Student ', '')}${n > 1 ? ' ×' + n : ''}`).join(' · ');
+    return `<button type="button" data-i="${i}"><span class="stu-nm">${esc(e.n)}</span>${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}<span class="stu-meta">${esc(where)}</span></button>`;
+  }).join('');
+  $('#sugg').onclick = ev => { const bt = ev.target.closest('button[data-i]'); if (bt) openStudent(items[Number(bt.dataset.i)]); };
+}
+$('#q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(runSearch, 80); });
 
 async function openStudent(e){
   $('#sugg').innerHTML = ''; $('#hint').textContent = '';
-  $('#out').innerHTML = `<p class="note">Memuat data ${esc(e.n)}…</p>`;
+  $('#out').innerHTML = `<div class="sec-head"><h2>${esc(e.n)}</h2></div><div class="skel"></div><div class="skel"></div>`;
   try {
     const parts = await api('detail', {name: e.n, center: e.c});
+    $('#out').scrollIntoView({block: 'start'});
     let html = `<div class="sec-head"><h2>${esc(e.n)} ${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}</h2></div>`;
     parts.forEach(p => {
       html += `<div class="card stu-card"><h3>${esc(p.src)}${p.rows.length > 1 ? ` <span class="chip">${p.rows.length} baris</span>` : ''}</h3>`;
@@ -149,8 +163,10 @@ async function openStudent(e){
   } catch (err) { fail(err); }
 }
 
-// PIN tersimpan tetap dicek ulang ke server sebelum pencarian dibuka
-if (pin) api('verify').then(showApp, e => askPin(isPinErr(e) ? '' : e.message));
+// Daftar nama dari sesi ini dipakai langsung; selain itu diambil ulang (sekaligus mengecek PIN tersimpan)
+const cached = pin && ssGet();
+if (cached){ useList(cached); showApp(); runSearch(); }
+else if (pin){ showApp(); loadList().catch(e => isPinErr(e) ? askPin('') : fail(e)); }
 else askPin();
 })();
 </script>

@@ -14,3 +14,8 @@ feed publik dan tidak tersimpan di repo ini; PIN juga tidak ada di repo.
 
 Kolom nama anak dideteksi otomatis dari judul kolom (mis. "Kids Name", "Student Name", "Nama Anak").
 Kalau salah, isi `NAME_COL` di bagian atas `Code.gs`. Setelah mengubah kode: Deploy → Manage deployments → edit → Version: New version.
+
+Kecepatan: indeks (nama, center, nomor baris) disimpan di cache Apps Script hingga 6 jam. Jalankan sekali
+`pasangPemanasan` dari editor supaya indeks dibangun ulang tiap 30 menit di belakang layar. App mengambil
+daftar nama sekali per sesi (hanya nama, center, jumlah baris) lalu mencari langsung di HP; detail diambil
+lewat nomor baris, tanpa membaca ulang seluruh tab.

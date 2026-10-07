@@ -12,7 +12,6 @@ const SOURCES = ['Student Database', 'Student Management'];
 // const NAME_COL = {'Student Database': 'Kids Name', 'Student Management': 'Student Name'};
 const NAME_COL = {};
 const MAX_SUGGEST = 15;
-const CACHE_SEC = 600;
 const MAX_FAIL = 10, LOCK_SEC = 900;   // 10 PIN salah dalam 15 menit → semua percobaan dikunci 15 menit
 
 // Semua fungsi yang mengembalikan data wajib lolos cek PIN di server
@@ -37,12 +36,13 @@ function doGet() {
 }
 
 // API untuk halaman Kelas → Student di app (GitHub Pages). App mengirim POST tanpa akun Google:
-// body JSON {action: 'verify' | 'search' | 'detail', pin, q, name, center}; balasan JSON {ok, data} / {ok: false, error}.
+// body JSON {action: 'verify' | 'list' | 'search' | 'detail', pin, q, name, center}; balasan JSON {ok, data} / {ok: false, error}.
 function doPost(e) {
   let out;
   try {
     const b = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const data = b.action === 'verify' ? verify(b.pin)
+      : b.action === 'list' ? list(b.pin)
       : b.action === 'search' ? search(b.q, b.pin)
       : b.action === 'detail' ? detail(b.name, b.center, b.pin)
       : (() => { throw new Error('Aksi tidak dikenal'); })();
@@ -68,69 +68,95 @@ function sheetInfo_(name) {
   return {sh, head, nameIdx, centerIdx, lastRow, lastCol};
 }
 
-// Indeks ringan: hanya kolom nama + center, disimpan di cache 10 menit (dipecah karena batas 100 KB per kunci).
-// Cache per pengguna, supaya kalau web app dijalankan sebagai "User accessing the web app", orang yang tidak
-// punya akses ke Exboard tidak bisa membaca indeks milik orang lain.
-function index_() {
-  const cache = CacheService.getUserCache();
-  const meta = cache.get('idx:n');
-  if (meta) {
-    const parts = cache.getAll(Array.from({length: Number(meta)}, (_, i) => 'idx:' + i));
-    const txt = Array.from({length: Number(meta)}, (_, i) => parts['idx:' + i]).join('');
-    if (txt) return JSON.parse(txt);
-  }
-  const idx = {};   // kunci "nama|center" → {n, c, hits: {sumber: jumlah baris}}
-  const cols = {};
+// Indeks: nama + center + nomor baris di tiap tab. Disimpan di cache (dipecah karena batas 100 KB per kunci),
+// jadi pencarian dan detail tidak perlu membaca ulang seluruh tab. Dibangun ulang bila cache habis
+// atau lewat pemicu waktu (lihat pasangPemanasan).
+const IDX_SEC = 21600;   // maks. cache Apps Script = 6 jam; pemicu 30 menit menjaganya tetap baru
+
+function buildIndex_() {
+  const idx = {};   // kunci "nama|center" → {n, c, r: {sumber: [nomor baris]}}
   SOURCES.forEach(src => {
     const info = sheetInfo_(src);
-    if (!info || info.nameIdx < 0 || info.lastRow < 2) { cols[src] = info ? info.head[info.nameIdx] || null : null; return; }
-    cols[src] = info.head[info.nameIdx];
-    const names = info.sh.getRange(2, info.nameIdx + 1, info.lastRow - 1, 1).getDisplayValues();
-    const centers = info.centerIdx >= 0 ? info.sh.getRange(2, info.centerIdx + 1, info.lastRow - 1, 1).getDisplayValues() : null;
+    if (!info || info.nameIdx < 0 || info.lastRow < 2) return;
+    const names = info.sh.getRange(2, info.nameIdx + 1, info.lastRow - 1, 1).getValues();
+    const centers = info.centerIdx >= 0 ? info.sh.getRange(2, info.centerIdx + 1, info.lastRow - 1, 1).getValues() : null;
     names.forEach((r, i) => {
       const n = String(r[0]).trim(); if (!n) return;
       const c = centers ? String(centers[i][0]).trim().toUpperCase() : '';
       const k = norm_(n) + '|' + c;
-      const e = idx[k] || (idx[k] = {n, c, hits: {}});
-      e.hits[src] = (e.hits[src] || 0) + 1;
+      const e = idx[k] || (idx[k] = {n, c, r: {}});
+      (e.r[src] || (e.r[src] = [])).push(i + 2);
     });
   });
-  const out = {entries: Object.values(idx), cols};
-  const txt = JSON.stringify(out), size = 90000, put = {};
-  for (let i = 0; i * size < txt.length; i++) put['idx:' + i] = txt.slice(i * size, (i + 1) * size);
-  put['idx:n'] = String(Object.keys(put).length);
-  try { cache.putAll(put, CACHE_SEC); } catch (e) {}
+  const out = {entries: Object.values(idx), at: Date.now()};
+  const cache = CacheService.getScriptCache(), txt = JSON.stringify(out), size = 90000, put = {};
+  let n = 0;
+  for (; n * size < txt.length; n++) put['idx:' + n] = txt.slice(n * size, (n + 1) * size);
+  put['idx:n'] = String(n);
+  try { cache.putAll(put, IDX_SEC); } catch (e) {}
   return out;
 }
 
-// Saran nama: semua kata yang diketik harus ada di nama; yang diawali kata pertama tampil lebih dulu
+function index_() {
+  const cache = CacheService.getScriptCache(), meta = cache.get('idx:n');
+  if (meta) {
+    const keys = Array.from({length: Number(meta)}, (_, i) => 'idx:' + i), parts = cache.getAll(keys);
+    if (keys.every(k => parts[k] != null)) return JSON.parse(keys.map(k => parts[k]).join(''));
+  }
+  return buildIndex_();
+}
+
+// Nomor kolom → huruf (1 → A, 81 → CC)
+const col_ = n => { let t = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) t = String.fromCharCode(65 + (n - 1) % 26) + t; return t; };
+
+const hitsOf_ = e => Object.fromEntries(Object.entries(e.r).map(([s, rows]) => [s, rows.length]));
+
+// Daftar semua nama (untuk pencarian langsung di HP): [nama, center, jumlah baris per tab]
+function list(pin) {
+  checkPin_(pin);
+  return {sources: SOURCES, rows: index_().entries.map(e => [e.n, e.c].concat(SOURCES.map(s => (e.r[s] || []).length)))};
+}
+
+// Saran nama (dipakai Index.html): semua kata yang diketik harus ada di nama
 function search(q, pin) {
   checkPin_(pin);
   const words = norm_(q).split(' ').filter(Boolean);
-  if (!words.length || norm_(q).length < 2) return {items: [], cols: null};
-  const {entries, cols} = index_();
-  const hits = entries.filter(e => { const n = norm_(e.n); return words.every(w => n.includes(w)); });
+  if (!words.length || norm_(q).length < 2) return {items: []};
+  const hits = index_().entries.filter(e => { const n = norm_(e.n); return words.every(w => n.includes(w)); });
   hits.sort((a, b) => (norm_(b.n).startsWith(words[0]) - norm_(a.n).startsWith(words[0])) || a.n.localeCompare(b.n));
-  return {items: hits.slice(0, MAX_SUGGEST), more: Math.max(0, hits.length - MAX_SUGGEST), cols};
+  return {items: hits.slice(0, MAX_SUGGEST).map(e => ({n: e.n, c: e.c, hits: hitsOf_(e)})), more: Math.max(0, hits.length - MAX_SUGGEST)};
 }
 
-// Semua baris dengan nama (dan center, bila ada) yang sama, dari kedua tab
+// Semua baris dengan nama (dan center) yang sama dari kedua tab. Baris diambil langsung lewat nomor baris
+// di indeks; kalau isinya sudah bergeser (data berubah sejak indeks dibuat), indeks dibangun ulang sekali.
 function detail(name, center, pin) {
   checkPin_(pin);
   const target = norm_(name), c = String(center || '').toUpperCase();
-  return SOURCES.map(src => {
-    const info = sheetInfo_(src);
-    if (!info || info.nameIdx < 0 || info.lastRow < 2) return {src, head: [], rows: [], missing: true};
-    const names = info.sh.getRange(2, info.nameIdx + 1, info.lastRow - 1, 1).getDisplayValues();
-    const centers = info.centerIdx >= 0 ? info.sh.getRange(2, info.centerIdx + 1, info.lastRow - 1, 1).getDisplayValues() : null;
-    const rows = [];
-    names.forEach((r, i) => {
-      if (norm_(r[0]) !== target) return;
-      if (centers && c && String(centers[i][0]).trim().toUpperCase() !== c) return;
-      rows.push(info.sh.getRange(i + 2, 1, 1, info.lastCol).getDisplayValues()[0]);
+  const read = idx => {
+    const e = idx.entries.find(x => norm_(x.n) === target && x.c === c);
+    let stale = false;
+    const parts = SOURCES.map(src => {
+      const info = sheetInfo_(src);
+      if (!info || info.nameIdx < 0) return {src, head: [], rows: [], missing: true};
+      const nums = (e && e.r[src]) || [];
+      const rows = nums.length ? info.sh.getRangeList(nums.map(r => 'A' + r + ':' + col_(info.lastCol) + r)).getRanges().map(rg => rg.getDisplayValues()[0]) : [];
+      if (rows.some(r => norm_(r[info.nameIdx]) !== target)) stale = true;
+      return {src, head: info.head, rows};
     });
-    return {src, head: info.head, rows};
-  });
+    return {parts, stale};
+  };
+  let res = read(index_());
+  if (res.stale) res = read(buildIndex_());
+  return res.parts;
+}
+
+// Jalankan SEKALI dari editor (pilih "pasangPemanasan" → Run): indeks dibangun ulang tiap 30 menit di belakang
+// layar, jadi pencarian dari HP tidak perlu menunggu indeks dibuat.
+function pasangPemanasan() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'buildIndex_').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('buildIndex_').timeBased().everyMinutes(30).create();
+  buildIndex_();
+  console.log('Pemanasan terpasang: indeks dibangun ulang tiap 30 menit.');
 }
 
 // Jalankan fungsi ini dari editor (pilih "cekSetup" di daftar fungsi → Run) untuk memeriksa pemasangan.
