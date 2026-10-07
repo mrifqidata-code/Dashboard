@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --page:#f3f4f1; --surface:#ffffff; --surface-2:#f6f6f3; --ink:#0b0b0b; --ink-2:#52514e; --muted:#7d7b75;
+  --border:rgba(11,11,11,.10); --border-2:rgba(11,11,11,.18); --accent:#0b6475; --accent-soft:#dcedf0; --crit-bg:#fbe6e6; --crit-ink:#a32626;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#8f8d86;
+    --border:rgba(255,255,255,.10); --border-2:rgba(255,255,255,.2); --accent:#4fb4c6; --accent-soft:#16343a; --crit-bg:#3d1a1a; --crit-ink:#f39292;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font:15px/1.45 "Poppins",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+header{background:var(--surface);border-bottom:1px solid var(--border)}
+.top{display:flex;align-items:center;gap:12px;min-height:60px}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+h1{font-size:17px;margin:0}
+.sub{font-size:12.5px;color:var(--ink-2);margin:0}
+.back{margin-left:auto;font-size:13px;font-weight:600;color:var(--accent);text-decoration:none;white-space:nowrap}
+main{padding:16px 0 32px}
+.search{position:relative}
+input{width:100%;min-height:48px;border:1px solid var(--border-2);border-radius:12px;background:var(--surface);color:inherit;font:inherit;font-size:16px;padding:10px 14px}
+input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.hint{font-size:12.5px;color:var(--muted);margin:8px 2px 0}
+.sugg{display:grid;gap:6px;margin-top:10px}
+.sugg button{display:flex;align-items:center;gap:10px;text-align:left;width:100%;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;font:inherit;color:inherit;cursor:pointer}
+.sugg button:hover,.sugg button:focus-visible{border-color:var(--accent);outline:none}
+.sugg .nm{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sugg .meta{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.chip{display:inline-flex;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;background:var(--accent-soft);color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:14px}
+.card h2{font-size:15.5px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.rowlab{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
+dl{display:grid;grid-template-columns:minmax(0,38%) minmax(0,1fr);gap:6px 12px;margin:0;font-size:14px}
+dt{color:var(--ink-2);overflow-wrap:anywhere}
+dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.empty{color:var(--muted);font-size:14px;margin:6px 0 0}
+.err{background:var(--crit-bg);color:var(--crit-ink);border-radius:12px;padding:12px 14px;margin-top:12px;font-size:14px}
+.title{display:flex;align-items:center;gap:10px;margin-top:18px}
+.title h2{font-size:18px;margin:0}
+.loading{color:var(--muted);font-size:14px;margin-top:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-3.6 3.8-5.5 7-5.5s6 1.9 7 5.5"/></svg></div>
+    <div><h1>Student</h1><p class="sub">Kelas · data Student Database &amp; Student Management</p></div>
+    <a class="back" href="https://mrifqidata-code.github.io/Dashboard/kelas/">← Dashboard</a>
+  </div>
+</header>
+<main class="wrap">
+  <div class="search">
+    <input id="q" type="search" placeholder="Ketik nama anak…" autocomplete="off" autofocus aria-label="Cari nama anak">
+    <p class="hint" id="hint">Ketik minimal 2 huruf, lalu pilih nama dari daftar.</p>
+    <div class="sugg" id="sugg" role="listbox"></div>
+  </div>
+  <div id="out"></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let timer = null, seq = 0;
+
+function call(fn, ...args){
+  return new Promise((ok, fail) => google.script.run.withSuccessHandler(ok).withFailureHandler(fail)[fn](...args));
+}
+function showErr(e){ $('#out').innerHTML = `<div class="err">Gagal membaca data: ${esc(e && e.message || e)}</div>`; }
+
+$('#q').addEventListener('input', () => {
+  clearTimeout(timer);
+  const q = $('#q').value.trim();
+  if (q.length < 2){ $('#sugg').innerHTML = ''; $('#hint').textContent = 'Ketik minimal 2 huruf, lalu pilih nama dari daftar.'; return; }
+  timer = setTimeout(async () => {
+    const my = ++seq;
+    $('#hint').textContent = 'Mencari…';
+    try {
+      const res = await call('search', q);
+      if (my !== seq) return;
+      const items = res.items || [];
+      $('#hint').textContent = items.length ? `${items.length}${res.more ? '+' : ''} nama cocok${res.more ? ` (perjelas ketikan untuk ${res.more} lainnya)` : ''}.` : 'Tidak ada nama yang cocok.';
+      $('#sugg').innerHTML = items.map((e, i) => {
+        const where = Object.entries(e.hits).map(([s, n]) => `${s.replace('Student ', '')}${n > 1 ? ' ×' + n : ''}`).join(' · ');
+        return `<button type="button" role="option" data-i="${i}"><span class="nm">${esc(e.n)}</span>${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}<span class="meta">${esc(where)}</span></button>`;
+      }).join('');
+      $('#sugg').onclick = ev => { const b = ev.target.closest('button[data-i]'); if (b) open_(items[Number(b.dataset.i)]); };
+    } catch (e) { if (my === seq){ $('#hint').textContent = ''; showErr(e); } }
+  }, 300);
+});
+
+async function open_(e){
+  $('#sugg').innerHTML = ''; $('#hint').textContent = '';
+  $('#out').innerHTML = `<p class="loading">Memuat data ${esc(e.n)}…</p>`;
+  try {
+    const parts = await call('detail', e.n, e.c);
+    let html = `<div class="title"><h2>${esc(e.n)}</h2>${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}</div>`;
+    parts.forEach(p => {
+      html += `<div class="card"><h2>${esc(p.src)}${p.rows.length > 1 ? ` <span class="chip">${p.rows.length} baris</span>` : ''}</h2>`;
+      if (p.missing) html += '<p class="empty">Tab atau kolom nama tidak ditemukan.</p>';
+      else if (!p.rows.length) html += '<p class="empty">Tidak ada data dengan nama ini.</p>';
+      p.rows.forEach((r, i) => {
+        if (p.rows.length > 1) html += `<div class="rowlab">Baris ${i + 1}</div>`;
+        html += '<dl>' + p.head.map((h, j) => (h && String(r[j]).trim()) ? `<dt>${esc(h)}</dt><dd>${esc(r[j])}</dd>` : '').join('') + '</dl>';
+      });
+      html += '</div>';
+    });
+    $('#out').innerHTML = html;
+    window.scrollTo(0, 0);
+  } catch (err) { showErr(err); }
+}
+</script>
+</body>
+</html>

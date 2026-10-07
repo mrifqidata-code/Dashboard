@@ -24,7 +24,8 @@ const NAV = [
   {id:'kelas', label:'Kelas', subs:[
     {id:'kelas', label:'Slot Map', href:'kelas/'},
     {id:'kelas-utilisasi', label:'Utilisasi', href:'kelas/utilisasi/'},
-    {id:'kelas-coach', label:'Coach', href:'kelas/coach/'}]}
+    {id:'kelas-coach', label:'Coach', href:'kelas/coach/'},
+    {id:'kelas-student', label:'Student'}]}
 ];
 
 /* ---------- Utilitas ---------- */
@@ -146,7 +147,7 @@ function mountNav(pageId){
     const sub = document.createElement('nav');
     sub.className = 'subnav'; sub.setAttribute('aria-label', cat.label);
     sub.innerHTML = `<div class="wrap">${cat.subs.map(s => s.href
-      ? `<a href="${ROOT + s.href}"${s.id===pageId ? ' aria-current="page"' : ''}>${esc(s.label)}</a>`
+      ? `<a href="${/^https?:/.test(s.href) ? s.href : ROOT + s.href}"${s.id===pageId ? ' aria-current="page"' : ''}>${esc(s.label)}</a>`
       : `<span class="soon" title="Segera hadir">${esc(s.label)} <small>segera</small></span>`).join('')}<button type="button" class="fontbtn" title="Ganti font (uji coba)"></button></div>`;
     header.insertAdjacentElement('afterend', sub);
     const fb = sub.querySelector('.fontbtn');
