@@ -33,9 +33,11 @@ function sheetInfo_(name) {
   return {sh, head, nameIdx, centerIdx, lastRow, lastCol};
 }
 
-// Indeks ringan: hanya kolom nama + center, disimpan di cache 10 menit (dipecah karena batas 100 KB per kunci)
+// Indeks ringan: hanya kolom nama + center, disimpan di cache 10 menit (dipecah karena batas 100 KB per kunci).
+// Cache per pengguna, supaya kalau web app dijalankan sebagai "User accessing the web app", orang yang tidak
+// punya akses ke Exboard tidak bisa membaca indeks milik orang lain.
 function index_() {
-  const cache = CacheService.getScriptCache();
+  const cache = CacheService.getUserCache();
   const meta = cache.get('idx:n');
   if (meta) {
     const parts = cache.getAll(Array.from({length: Number(meta)}, (_, i) => 'idx:' + i));
