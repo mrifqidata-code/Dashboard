@@ -50,10 +50,12 @@ const R = DA.report, {esc} = DA;
 const $ = s => document.querySelector(s);
 DA.mountNav('center-trial');
 const FEED = {id:'1rf4XebE5DbRaHBKwoOnyy9wdbEMrctLgc3VYjXrxezw', name:'Feed Class Trial (dari Exboard)', cache:'dashboardApp.trial.v1'};
-const AGE_KEY = 'dashboardApp.trialAge', TIME_KEY = 'dashboardApp.trialTime';
+const AGE_KEY = 'dashboardApp.trialAge', TIME_KEY = 'dashboardApp.trialTime', SRC_KEY = 'dashboardApp.trialSource';
+const NET = 'Tanpa crosspol', CP = 'Crosspol saja';
+if (DA.lsGet(SRC_KEY)==null) DA.lsSet(SRC_KEY, NET);   // bawaan: angka sudah dikurangi crosspol
 const P = R.period('dashboardApp.trialRange', () => view.redraw());
-$('#cChips').insertAdjacentHTML('afterend', '<div class="cbar" id="aChips"></div><div class="cbar" id="tChips" hidden></div>');
-let center = DA.center.get(), age = 'ALL', time = 'ALL';
+$('#cChips').insertAdjacentHTML('afterend', '<div class="cbar" id="aChips"></div><div class="cbar" id="tChips" hidden></div><div class="cbar" id="sChips" hidden></div>');
+let center = DA.center.get(), age = 'ALL', time = 'ALL', src = 'ALL';
 
 // Feed: QUERY atas sheet Class Trial (per sesi) → satu baris per tanggal trial × center × age group × jam
 function parse(text){
@@ -70,7 +72,37 @@ function parse(text){
     const v = k => ix[k] >= 0 ? (R.num(r[ix[k]]) || 0) : 0;
     out.push({d, c, a: R.ageName(r[ix.a]), t: ix.t >= 0 ? R.toTime(r[ix.t]) : '', bk: v('bk'), cf: v('cf'), su: v('su'), dp: v('dp'), rf: v('rf'), tp: v('tp')});
   }
+  return {ct: out, cp: parseCrosspol(rows)};
+}
+
+// Blok kedua feed (dari tab "Feed Crosspol" Exboard): kolom Kunci = "tanggal|center|age group|jam|status|show up|paid fee"
+// dan Jumlah = banyaknya anak crosspol. Sumber: tab Crosspoll + Register Trial dengan Source Lead "Cross Poll".
+function payOf(s){
+  s = R.T(s).toLowerCase().replace(/^regist\b/, 'regis').replace(/regis fee \+ member/, 'regis + member');
+  return s==='regis fee only' ? 'dp' : (s==='regis + member fee' || s==='member fee') ? 'full' : 'none';
+}
+function parseCrosspol(rows){
+  let hi = -1, kc = -1;
+  for (let i = 0; i < Math.min(rows.length, 5) && kc < 0; i++){ kc = (rows[i] || []).findIndex(h => /^kunci$/i.test(R.T(h))); hi = i; }
+  if (kc < 0) return null;
+  const out = [];
+  for (const r of rows.slice(hi+1)){
+    const k = R.T(r[kc]), n = R.num(r[kc+1]) || 0; if (!k || !n) continue;
+    const [d0, c0, a0, t0, st, su0, pf] = k.split('|');
+    const d = R.toIso(d0), c = R.T(c0).toUpperCase(); if (!d || !DA.CENTERS.includes(c)) continue;
+    const pay = payOf(pf), su = /^true$/i.test(R.T(su0));
+    out.push({d, c, a: R.ageName(a0), t: R.toTime(t0), st: R.T(st), bk: n, cf: /confirm/i.test(st || '') ? n : 0, su: su ? n : 0,
+      dp: pay==='dp' ? n : 0, rf: pay==='full' ? n : 0, tp: pay==='none' ? 0 : n});
+  }
   return out;
+}
+// Sumber angka: Class Trial dikurangi crosspol (bawaan), crosspol saja, atau Class Trial apa adanya
+const neg = x => ({...x, bk: -x.bk, cf: -x.cf, su: -x.su, dp: -x.dp, rf: -x.rf, tp: -x.tp});
+function pick(data){
+  if (!data.cp) return data.ct;
+  if (src===CP) return data.cp;
+  if (src===NET) return data.ct.concat(data.cp.map(neg));
+  return data.ct;
 }
 
 const KEYS = ['bk','cf','su','dp','rf','tp'];
@@ -82,10 +114,13 @@ const cells = t => [R.fmt(t.bk,0), R.fmt(t.cf,0), R.fmt(t.su,0), R.fmt(t.dp,0), 
 const tones = t => ['','','','','','','', cvrTone(pct(t.tp, t.su))];   // warna hanya di kolom CVR
 const line = (label, t, cls) => ({cls: cls || '', cells: [label].concat(cells(t)), tones: [''].concat(tones(t))});
 
-const view = R.start({feed: FEED, parse, render, foot: 'Tanggal = tanggal kelas trial (Trial Date di sheet Class Trial). Age group: Baby 6–17 bln, Tiny 18–36 bln, Little 3–5 th, Kids 5–8+ th, Star 9–12 th. Paid DP = # Regis, Regis Full = # Regis + Full. Show up rate = show up ÷ booking, CVR = total paid ÷ show up.'});
+const view = R.start({feed: FEED, parse, render, foot: 'Tanggal = tanggal kelas trial (Trial Date di sheet Class Trial). Age group: Baby 6–17 bln, Tiny 18–36 bln, Little 3–5 th, Kids 5–8+ th, Star 9–12 th. Paid DP = # Regis, Regis Full = # Regis + Full. Show up rate = show up ÷ booking, CVR = total paid ÷ show up. Tanpa crosspol = angka Class Trial dikurangi anak crosspol (tab Crosspoll + Register Trial dengan Source Lead Cross Poll) pada tanggal, center, age group dan jam yang sama.'});
 
-function render(all){
+function render(data){
   center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
+  $('#sChips').hidden = !data.cp;
+  src = data.cp ? R.pickChips($('#sChips'), [NET, CP], SRC_KEY, {all:'Semua sumber', aria:'Pilih sumber lead'}, () => view.redraw()) : 'ALL';
+  const all = pick(data);
   const ages = [...new Set(all.map(x => x.a))].sort(R.ageSort);
   age = R.ageChips($('#aChips'), ages, AGE_KEY, () => view.redraw());
   // Jam sesi; baris chip hanya muncul bila feed sudah punya kolom Jam
@@ -99,7 +134,7 @@ function render(all){
   P.bounds(dates);
   const inRange = all.filter(x => x.d >= P.from && x.d <= P.to);
   const inScope = inRange.filter(x => fC(x) && fA(x) && fT(x));
-  const scopeLabel = [center==='ALL' ? 'Semua center' : center, age==='ALL' ? '' : age, time==='ALL' ? '' : 'jam ' + time].filter(Boolean).join(' · ');
+  const scopeLabel = [center==='ALL' ? 'Semua center' : center, age==='ALL' ? '' : age, time==='ALL' ? '' : 'jam ' + time, data.cp && src===NET ? 'tanpa crosspol' : data.cp && src===CP ? 'crosspol' : ''].filter(Boolean).join(' · ');
   $('#sub').textContent = `${P.label()} · ${scopeLabel}`;
   if (!inScope.length){
     const span = dates.length ? ` Data tersedia ${R.niceDate(dates[0])} – ${R.niceDate(dates[dates.length-1])}.` : '';
