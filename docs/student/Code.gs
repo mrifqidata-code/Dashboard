@@ -22,7 +22,7 @@ function checkPin_(pin) {
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get('pinfail') || 0);
   if (fails >= MAX_FAIL) throw new Error('Terlalu banyak PIN salah. Coba lagi 15 menit lagi.');
-  if (String(pin || '') !== String(want)) {
+  if (String(pin || '').trim() !== String(want).trim()) {   // spasi tak sengaja di Script Property diabaikan
     cache.put('pinfail', String(fails + 1), LOCK_SEC);
     throw new Error('PIN_SALAH');
   }
