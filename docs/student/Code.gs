@@ -11,6 +11,17 @@ const SOURCES = ['Student Database', 'Student Management'];
 // Kolom nama anak dideteksi otomatis dari judul kolom. Kalau salah, isi nama judul kolomnya persis, mis.
 // const NAME_COL = {'Student Database': 'Kids Name', 'Student Management': 'Student Name'};
 const NAME_COL = {};
+// Kolom yang TIDAK dikirim ke halaman Student (judul kolom; besar-kecil huruf dan tanda * diabaikan)
+const HIDE = {
+  'Student Database': ['No', 'Pre Sparks ID Formula', "Child's Nick Name", 'Day of Birth', 'Month of Birth', 'Year of Birth',
+    'Regist Day', 'Regist Month', 'Regist Year', 'Main Phone Number', 'Alamat', 'Referral Code', 'Uang Pangkal', 'Member Fee',
+    'Weekend Fee', 'Potongan Uang Pangkal', 'Potongan Member Fee', 'DP', 'Pembayaran Selain DP', 'English Student?',
+    'Source Lead', 'Get Bag?', 'Contract (Months)', 'Total Sesi'],
+  'Student Management': ['Center', 'Student ID', 'Name', 'Age', 'Parents Name', 'Package', 'Day', 'Time (hh:mm)',
+    'Next Schedule (yyyy-mm-dd)', "Child's Nickname", 'Main Phone Number', 'Unique Key + Name (copy-paste ke kolom B Attendance Log)',
+    'Last attendance log', 'Actual last class']
+};
+const hkey_ = h => String(h || '').replace(/[\u2018\u2019`]/g, "'").replace(/[*]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 const MAX_SUGGEST = 15;
 const MAX_FAIL = 10, LOCK_SEC = 900;   // 10 PIN salah dalam 15 menit → semua percobaan dikunci 15 menit
 
@@ -141,7 +152,10 @@ function detail(name, center, pin) {
       const nums = (e && e.r[src]) || [];
       const rows = nums.length ? info.sh.getRangeList(nums.map(r => 'A' + r + ':' + col_(info.lastCol) + r)).getRanges().map(rg => rg.getDisplayValues()[0]) : [];
       if (rows.some(r => norm_(r[info.nameIdx]) !== target)) stale = true;
-      return {src, head: info.head, rows};
+      // Kolom tersembunyi dibuang di server, jadi tidak pernah terkirim ke HP
+      const hide = new Set((HIDE[src] || []).map(hkey_));
+      const keep = info.head.map((h, j) => j).filter(j => !hide.has(hkey_(info.head[j])));
+      return {src, head: keep.map(j => info.head[j]), rows: rows.map(r => keep.map(j => r[j]))};
     });
     return {parts, stale};
   };
