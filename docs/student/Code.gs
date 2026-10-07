@@ -115,3 +115,17 @@ function detail(name, center, pin) {
     return {src, head: info.head, rows};
   });
 }
+
+// Jalankan fungsi ini dari editor (pilih "cekSetup" di daftar fungsi → Run) untuk memeriksa pemasangan.
+// Tidak menampilkan PIN maupun data murid; hanya status pengaturan dan kolom yang terdeteksi.
+function cekSetup() {
+  const want = PropertiesService.getScriptProperties().getProperty('STUDENT_PIN');
+  console.log(want ? `STUDENT_PIN terisi (${String(want).trim().length} karakter).` : 'STUDENT_PIN BELUM diisi di Script Properties.');
+  CacheService.getScriptCache().remove('pinfail');
+  console.log('Hitungan PIN salah direset.');
+  SOURCES.forEach(src => {
+    const info = sheetInfo_(src);
+    if (!info) return console.log(`${src}: tab tidak ditemukan.`);
+    console.log(`${src}: ${info.lastRow - 1} baris; kolom nama = "${info.nameIdx >= 0 ? info.head[info.nameIdx] : 'TIDAK TERDETEKSI'}"; kolom center = "${info.centerIdx >= 0 ? info.head[info.centerIdx] : '-'}"`);
+  });
+}
