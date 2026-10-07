@@ -125,7 +125,8 @@ function render(data){
   age = R.ageChips($('#aChips'), ages, AGE_KEY, () => view.redraw());
   // Jam sesi; baris chip hanya muncul bila feed sudah punya kolom Jam
   // Hanya jam yang pernah dipakai center terpilih, supaya pilihannya tidak terlalu panjang
-  const times = [...new Set(all.filter(x => center==='ALL' || x.c===center).map(x => x.t).filter(Boolean))].sort(R.timeSort);
+  // Jam diambil dari jadwal Class Trial (crosspol tanpa jam / jam yang tidak ada sesinya tidak dijadikan pilihan)
+  const times = [...new Set((src===CP ? data.cp : data.ct).filter(x => center==='ALL' || x.c===center).map(x => x.t).filter(t => t && t !== '00:00'))].sort(R.timeSort);
   $('#tChips').hidden = !times.length;
   time = times.length ? R.pickChips($('#tChips'), times, TIME_KEY, {all:'Semua jam', aria:'Pilih jam'}, () => view.redraw()) : 'ALL';
   const fC = x => center==='ALL' || x.c===center, fA = x => age==='ALL' || x.a===age, fT = x => time==='ALL' || x.t===time;

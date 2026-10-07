@@ -152,7 +152,7 @@ function period(key, onChange){
   };
 }
 // Label umur di Exboard ("6-17 Mo", …) → nama kelas; label lain ditampilkan apa adanya
-const AGE_NAMES = [[/^6\s*-\s*17\s*mo/i, 'Baby'], [/^18\s*-\s*36\s*mo/i, 'Tiny'], [/^3\s*-\s*5\s*yo/i, 'Little'], [/^5\s*-\s*8/i, 'Kids'], [/^9\s*-\s*12\s*yo/i, 'Star']];
+const AGE_NAMES = [[/^6\s*-\s*1[78]\s*mo/i, 'Baby'], [/^18\s*-\s*36\s*mo/i, 'Tiny'], [/^3\s*-\s*5\s*yo/i, 'Little'], [/^5\s*-\s*8/i, 'Kids'], [/^9\s*-\s*12\s*yo/i, 'Star']];
 const ageName = s => { s = T(s); if (!s) return 'Lainnya'; const m = AGE_NAMES.find(([re, n]) => re.test(s) || s.toLowerCase()===n.toLowerCase()); return m ? m[1] : s; };
 // Urut Baby → Star, lalu label lain dari umur termuda ("x Mo" = bulan, "x Yo" = tahun)
 const ageMonths = s => { const m = /(\d+)\D*?(mo|yo|bulan|tahun|th)?/i.exec(s); if (!m) return 1e9; return Number(m[1]) * (/^(yo|tahun|th)/i.test(m[2] || s.replace(/^[^a-z]*/i,'')) ? 12 : 1); };
