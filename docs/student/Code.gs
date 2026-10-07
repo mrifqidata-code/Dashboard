@@ -1,9 +1,11 @@
-/* Halaman Student (privat): ketik nama anak → pilih → tampil semua data dari tab Student Database
-   dan Student Management di Exboard. Data dibaca di server Google dan hanya dikirim ke pemilik akun;
+/* Halaman Student: ketik nama anak → pilih → tampil semua data dari tab Student Database
+   dan Student Management di Exboard. Data dibaca di server Google dan hanya dikirim setelah PIN benar;
    tidak ada feed publik.
 
-   Pasang: buka Exboard → Extensions → Apps Script, tempel file ini sebagai Code.gs dan Index.html,
-   lalu Deploy → New deployment → Web app → Execute as: Me, Who has access: Only myself. */
+   Pasang: buka Exboard → Extensions → Apps Script, tempel file ini sebagai Code.gs dan Index.html.
+   PIN: Project Settings (ikon ⚙) → Script Properties → Add script property → STUDENT_PIN = PIN pilihanmu
+   (minimal 6 angka). PIN tidak pernah ditulis di kode ini.
+   Deploy → New deployment → Web app → Execute as: Me, Who has access: Anyone. */
 
 const SOURCES = ['Student Database', 'Student Management'];
 // Kolom nama anak dideteksi otomatis dari judul kolom. Kalau salah, isi nama judul kolomnya persis, mis.
@@ -11,6 +13,22 @@ const SOURCES = ['Student Database', 'Student Management'];
 const NAME_COL = {};
 const MAX_SUGGEST = 15;
 const CACHE_SEC = 600;
+const MAX_FAIL = 10, LOCK_SEC = 900;   // 10 PIN salah dalam 15 menit → semua percobaan dikunci 15 menit
+
+// Semua fungsi yang mengembalikan data wajib lolos cek PIN di server
+function checkPin_(pin) {
+  const want = PropertiesService.getScriptProperties().getProperty('STUDENT_PIN');
+  if (!want) throw new Error('PIN belum diatur. Isi Script Property STUDENT_PIN di Apps Script.');
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get('pinfail') || 0);
+  if (fails >= MAX_FAIL) throw new Error('Terlalu banyak PIN salah. Coba lagi 15 menit lagi.');
+  if (String(pin || '') !== String(want)) {
+    cache.put('pinfail', String(fails + 1), LOCK_SEC);
+    throw new Error('PIN_SALAH');
+  }
+}
+
+function verify(pin) { checkPin_(pin); return true; }
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
@@ -69,7 +87,8 @@ function index_() {
 }
 
 // Saran nama: semua kata yang diketik harus ada di nama; yang diawali kata pertama tampil lebih dulu
-function search(q) {
+function search(q, pin) {
+  checkPin_(pin);
   const words = norm_(q).split(' ').filter(Boolean);
   if (!words.length || norm_(q).length < 2) return {items: [], cols: null};
   const {entries, cols} = index_();
@@ -79,7 +98,8 @@ function search(q) {
 }
 
 // Semua baris dengan nama (dan center, bila ada) yang sama, dari kedua tab
-function detail(name, center) {
+function detail(name, center, pin) {
+  checkPin_(pin);
   const target = norm_(name), c = String(center || '').toUpperCase();
   return SOURCES.map(src => {
     const info = sheetInfo_(src);

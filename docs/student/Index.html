@@ -52,6 +52,14 @@ dd{margin:0;font-weight:600;overflow-wrap:anywhere}
 .title{display:flex;align-items:center;gap:10px;margin-top:18px}
 .title h2{font-size:18px;margin:0}
 .loading{color:var(--muted);font-size:14px;margin-top:12px}
+.pin{max-width:360px;margin:24px auto 0;text-align:center}
+.pin h2{font-size:17px;margin:0 0 6px}
+.pin p{color:var(--ink-2);font-size:14px;margin:0 0 14px}
+.pin input{text-align:center;letter-spacing:.3em;font-size:20px}
+.btn{min-height:44px;margin-top:10px;width:100%;border:0;border-radius:12px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.5}
+.lock{border:1px solid var(--border-2);background:var(--surface);color:var(--ink-2);border-radius:10px;padding:6px 10px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;margin-left:8px}
+[hidden]{display:none !important}
 </style>
 </head>
 <body>
@@ -60,25 +68,61 @@ dd{margin:0;font-weight:600;overflow-wrap:anywhere}
     <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-3.6 3.8-5.5 7-5.5s6 1.9 7 5.5"/></svg></div>
     <div><h1>Student</h1><p class="sub">Kelas · data Student Database &amp; Student Management</p></div>
     <a class="back" href="https://mrifqidata-code.github.io/Dashboard/kelas/">← Dashboard</a>
+    <button class="lock" id="lockBtn" type="button" hidden title="Lupakan PIN di perangkat ini">Kunci</button>
   </div>
 </header>
 <main class="wrap">
+  <form class="pin" id="pinBox" hidden>
+    <h2>Masukkan PIN</h2>
+    <p>Data murid hanya tampil setelah PIN benar. PIN diingat di perangkat ini.</p>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN">
+    <button class="btn" id="pinBtn" type="submit">Buka</button>
+    <p class="hint" id="pinMsg"></p>
+  </form>
+  <div id="app" hidden>
   <div class="search">
-    <input id="q" type="search" placeholder="Ketik nama anak…" autocomplete="off" autofocus aria-label="Cari nama anak">
+    <input id="q" type="search" placeholder="Ketik nama anak…" autocomplete="off" aria-label="Cari nama anak">
     <p class="hint" id="hint">Ketik minimal 2 huruf, lalu pilih nama dari daftar.</p>
     <div class="sugg" id="sugg" role="listbox"></div>
   </div>
   <div id="out"></div>
+  </div>
 </main>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let timer = null, seq = 0;
+const PIN_KEY = 'studentPin';
+const lsGet = () => { try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } };
+const lsSet = v => { try { v ? localStorage.setItem(PIN_KEY, v) : localStorage.removeItem(PIN_KEY); } catch (e) {} };
+let pin = lsGet();
 
 function call(fn, ...args){
   return new Promise((ok, fail) => google.script.run.withSuccessHandler(ok).withFailureHandler(fail)[fn](...args));
 }
-function showErr(e){ $('#out').innerHTML = `<div class="err">Gagal membaca data: ${esc(e && e.message || e)}</div>`; }
+function showErr(e){
+  const m = String(e && e.message || e);
+  if (/PIN_SALAH/.test(m)) return askPin('PIN tidak cocok. Masukkan lagi.');
+  $('#out').innerHTML = `<div class="err">Gagal membaca data: ${esc(m)}</div>`;
+}
+function askPin(msg){
+  pin = ''; lsSet('');
+  $('#app').hidden = true; $('#lockBtn').hidden = true; $('#pinBox').hidden = false;
+  $('#pinMsg').textContent = msg || ''; $('#pin').value = ''; $('#pin').focus();
+}
+function showApp(){ $('#pinBox').hidden = true; $('#app').hidden = false; $('#lockBtn').hidden = false; $('#q').focus(); }
+$('#pinBox').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const v = $('#pin').value.trim(); if (!v) return;
+  $('#pinBtn').disabled = true; $('#pinMsg').textContent = 'Memeriksa…';
+  try { await call('verify', v); pin = v; lsSet(v); showApp(); }
+  catch (e) { const m = String(e && e.message || e); $('#pinMsg').textContent = /PIN_SALAH/.test(m) ? 'PIN tidak cocok.' : m; }
+  finally { $('#pinBtn').disabled = false; }
+});
+$('#lockBtn').addEventListener('click', () => { $('#out').innerHTML = ''; $('#sugg').innerHTML = ''; $('#q').value = ''; askPin('Terkunci. Masukkan PIN untuk membuka lagi.'); });
+// PIN tersimpan tetap dicek ulang ke server sebelum halaman dibuka
+if (pin) call('verify', pin).then(showApp, e => { const m = String(e && e.message || e); askPin(/PIN_SALAH/.test(m) ? '' : m); });
+else askPin();
 
 $('#q').addEventListener('input', () => {
   clearTimeout(timer);
@@ -88,7 +132,7 @@ $('#q').addEventListener('input', () => {
     const my = ++seq;
     $('#hint').textContent = 'Mencari…';
     try {
-      const res = await call('search', q);
+      const res = await call('search', q, pin);
       if (my !== seq) return;
       const items = res.items || [];
       $('#hint').textContent = items.length ? `${items.length}${res.more ? '+' : ''} nama cocok${res.more ? ` (perjelas ketikan untuk ${res.more} lainnya)` : ''}.` : 'Tidak ada nama yang cocok.';
@@ -105,7 +149,7 @@ async function open_(e){
   $('#sugg').innerHTML = ''; $('#hint').textContent = '';
   $('#out').innerHTML = `<p class="loading">Memuat data ${esc(e.n)}…</p>`;
   try {
-    const parts = await call('detail', e.n, e.c);
+    const parts = await call('detail', e.n, e.c, pin);
     let html = `<div class="title"><h2>${esc(e.n)}</h2>${e.c ? `<span class="chip">${esc(e.c)}</span>` : ''}</div>`;
     parts.forEach(p => {
       html += `<div class="card"><h2>${esc(p.src)}${p.rows.length > 1 ? ` <span class="chip">${p.rows.length} baris</span>` : ''}</h2>`;
