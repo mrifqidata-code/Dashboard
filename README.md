@@ -10,7 +10,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | | SUNP (show up not paid: alasan belum DP, potential; per center & age group, periode bebas) | `center/sunp/` | Feed SUNP (tab Feed SUNP di Exboard, rumus di `docs/feed-sunp.md`) |
 | | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | Cash & Piutang › Ringkasan (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
-| | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan, daftar murid perlu ditagih) | `center/cash/bertahap/` | Feed Cash Bertahap v2 (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`); daftar nama lewat Apps Script ber-PIN (`docs/student/`) |
+| | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan, daftar murid perlu ditagih) | `center/cash/bertahap/` | Feed Cash Bertahap v3 (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`); daftar nama lewat Apps Script ber-PIN (`docs/student/`) |
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
 | | Retention per SA Retention (SAR) | `sa/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | PIP (band & status PIP / Watch / OK per advisor) | `sa/pip/` | Feed Dashboard Tambahan (tab 05) |
