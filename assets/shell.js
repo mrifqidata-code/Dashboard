@@ -85,6 +85,22 @@ async function fetchPublicCsv(id){
   throw lastErr || {code:'blocked'};
 }
 
+/* ---------- Data murid (privat) ---------- */
+// Nama murid tidak lewat feed publik: halaman bertanya ke web app Apps Script di Exboard (docs/student/Code.gs),
+// yang hanya membalas bila PIN benar. Dikirim tanpa akun Google (credentials: omit), jadi tidak terpengaruh
+// banyaknya akun Google yang login di HP. Dipakai Kelas → Student dan Cash & Piutang → Cash Bertahap; PIN sama.
+const STUDENT_API = 'https://script.google.com/macros/s/AKfycbzHc-PlOTKY5QIqG78-P9EgC9dVjeC2qNW-gdSApZy9XK0mV-I9FTgnMv8pv0LdgUUjGQ/exec';
+const PIN_KEY = 'dashboardApp.studentPin';
+async function privateApi(action, pin, body){
+  let res;
+  try { res = await fetch(STUDENT_API, {method: 'POST', credentials: 'omit', redirect: 'follow', body: JSON.stringify({action, pin, ...body})}); }
+  catch (e) { throw new Error(navigator.onLine ? 'Tidak bisa menghubungi Apps Script.' : 'HP sedang offline.'); }
+  let j; try { j = await res.json(); } catch (e) { throw new Error('Balasan Apps Script tidak terbaca. Pastikan deployment versi terbaru dengan akses "Anyone".'); }
+  if (!j.ok) throw new Error(j.error || 'Gagal');
+  return j.data;
+}
+const isPinErr = e => /PIN_SALAH/.test(String(e && e.message));
+
 /* ---------- Filter center (dipakai bersama semua halaman) ---------- */
 const CENTER_KEY = 'dashboardApp.center';
 const center = {
@@ -172,5 +188,6 @@ function mountNav(pageId){
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register(ROOT + 'sw.js').catch(() => {});
 }
 
-window.DA = {ROOT, CENTERS, NAV, esc, lsGet, lsSet, fmtTime, parseCSV, sheetNum, fetchPublicCsv, center, centerChips, mountNav, font};
+window.DA = {ROOT, CENTERS, NAV, esc, lsGet, lsSet, fmtTime, parseCSV, sheetNum, fetchPublicCsv, center, centerChips, mountNav, font,
+  PIN_KEY, privateApi, isPinErr};
 })();

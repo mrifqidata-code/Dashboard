@@ -75,7 +75,7 @@ function sumDates(t, col, from, to){
 }
 
 function render(secs){
-  center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
+  center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); drawList(); });
   const cb = secs['CB Tracker'], six = secs['16 Cash Bertahap'];
   const A = R.table(cb, /^A\. STATUS CICILAN/i), B = R.table(cb, /^B\. NILAI/i), C = R.table(cb, /^C\. HARI SEJAK BAYAR/i),
         D = R.table(cb, /^D\. JATUH TEMPO/i), E = R.table(cb, /^E\. BAYAR TERAKHIR/i), S = R.table(six, /^A\. STATUS CASH BERTAHAP/i);
@@ -189,6 +189,98 @@ function render(secs){
   }
   return html;
 }
+// ---- Daftar murid perlu ditagih ----
+// Nama murid tidak lewat feed publik: diambil dari Apps Script ber-PIN (aksi 'cb', PIN sama dengan halaman Student),
+// hanya disimpan di memori selama halaman terbuka. Server sudah membuang yang lunas (termasuk kurang bayar < Rp 300.000).
+const LIST_KEY = 'dashboardApp.cbListFilter', STEP = 50;
+const ST_LABEL = {'ON TRACK': 'On track', TELAT: 'Telat', WARNING: 'Warning', DEFAULT: 'Default', 'TAGIHAN BELUM ADA': 'Belum ada tagihan', 'BELUM ADA DATA': 'Belum ada data'};
+const L = {state: 'idle', data: null, err: '', show: STEP, f: DA.lsGet(LIST_KEY) || 'ALL'};
+let pin = DA.lsGet(DA.PIN_KEY) || '';
+$('#view').insertAdjacentHTML('afterend', '<section id="cbx" aria-label="Daftar murid perlu ditagih"></section>');
+
+function today0(){
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  return {y, today: R.isoDate(now), som: R.isoDate(new Date(y, m, 1)), eom: R.isoDate(new Date(y, m+1, 0))};
+}
+// Pilihan status daftar; boleh tumpang-tindih (murid default biasanya juga tunggakan)
+const listFilters = t => [
+  ['ALL', 'Semua', () => true],
+  ['due', 'Jatuh tempo bulan ini', x => x.due >= t.som && x.due <= t.eom],
+  ['over', 'Tunggakan', x => !!x.due && x.due < t.som],
+  ['TELAT', 'Telat', x => x.st === 'TELAT'],
+  ['WARNING', 'Warning', x => x.st === 'WARNING'],
+  ['DEFAULT', 'Default', x => x.st === 'DEFAULT']];
+const shortDate = (s, y) => { if (!s) return '—'; const [yy, mm, dd] = s.split('-').map(Number); return `${dd} ${R.MON[mm-1]}${yy !== y ? ' ' + yy : ''}`; };
+
+function useList(d){
+  const ix = Object.fromEntries(d.cols.map((c, i) => [c, i])), key = x => x.due || '9999';
+  L.data = {at: d.at, rows: d.rows.map(r => ({n: r[ix.nama], c: r[ix.center], st: r[ix.status], last: r[ix.bayarTerakhir], days: r[ix.hari],
+    due: r[ix.jatuhTempo], sisa: r[ix.sisa], paid: r[ix.dibayar], bill: r[ix.tagihan], pkg: r[ix.package], sd: r[ix.statusSD], kel: r[ix.kelolosan], id: r[ix.id]}))
+    .sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.n.localeCompare(b.n))};
+  L.state = 'ok';
+}
+async function loadList(fresh){
+  if (!pin){ L.state = 'pin'; return drawList(); }
+  L.state = 'loading'; L.err = ''; drawList();
+  try { useList(await DA.privateApi('cb', pin, fresh ? {fresh: true} : {})); DA.lsSet(DA.PIN_KEY, pin); }
+  catch (e){
+    if (DA.isPinErr(e)){ pin = ''; DA.lsSet(DA.PIN_KEY, ''); L.state = 'pin'; L.err = 'PIN tidak cocok. Masukkan lagi.'; }
+    else { L.state = 'err'; L.err = /Aksi tidak dikenal/.test(e.message)
+      ? 'Apps Script di Exboard belum diperbarui untuk daftar ini. Tempel Code.gs terbaru, lalu Deploy → Manage deployments → edit → Version: New version.' : e.message; }
+  }
+  drawList();
+}
+function itemHtml(x, t){
+  const tone = x.st === 'DEFAULT' ? 'r' : x.st === 'TELAT' || x.st === 'WARNING' ? 'y' : '';
+  const pct = x.bill ? Math.round(x.paid / x.bill * 100) : null;
+  const extra = [x.pkg, x.sd ? 'Student Database: ' + x.sd : '', x.kel ? 'Kelolosan sesi' : '', x.id].filter(Boolean).join(' · ');
+  return `<div class="item ${tone}">
+    <div class="item-top"><span class="item-name">${esc(x.n)}</span><span class="item-sub"><span class="chip">${esc(x.c)}</span><span class="chip ${tone}">${esc(ST_LABEL[x.st] || x.st || '—')}</span></span></div>
+    <div class="mets">
+      <div class="met"><div class="ml">Bayar terakhir</div><div class="mv">${shortDate(x.last, t.y)}${x.days!=null ? ` <small>${R.fmt(x.days,0)} hari</small>` : ''}</div></div>
+      <div class="met"><div class="ml">Jatuh tempo</div><div class="mv${x.due && x.due < t.today ? ' late' : ''}">${shortDate(x.due, t.y)}</div></div>
+      <div class="met"><div class="ml">Sisa tagihan</div><div class="mv">${R.fmtRp(x.sisa)}</div></div>
+      <div class="met"><div class="ml">Sudah dibayar</div><div class="mv">${R.fmtRp(x.paid)}${pct!=null ? ` <small>${pct}%</small>` : ''}</div></div>
+    </div>${extra ? `<p class="note">${esc(extra)}</p>` : ''}</div>`;
+}
+function drawList(){
+  const el = $('#cbx'); if (!el) return;
+  const t = today0();
+  let h = `<div class="sec-head"><h2>Daftar murid perlu ditagih</h2>${L.state==='ok' ? `<button class="btn" type="button" data-lock title="Sembunyikan nama dan lupakan PIN di HP ini">Kunci</button>` : ''}</div>`;
+  if (L.state === 'pin'){
+    h += `<form class="card" id="cbxPin"><p class="note" style="margin:0 0 10px">Daftar nama murid dilindungi PIN, sama dengan PIN halaman Student.</p>
+      <div class="stu-bar"><input class="stu-input stu-pin-input" id="cbxPinIn" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN"><button class="btn stu-go" type="submit" style="width:auto;margin:0">Buka</button></div>
+      ${L.err ? `<p class="note">${esc(L.err)}</p>` : ''}</form>`;
+  } else if (L.state === 'err'){
+    h += `<div class="notice">${esc(L.err)}</div><button class="btn" type="button" data-retry>Coba lagi</button>`;
+  } else if (L.state !== 'ok'){
+    h += '<div class="skel"></div>';
+  } else {
+    const inC = L.data.rows.filter(x => center === 'ALL' || x.c === center), F = listFilters(t);
+    const cur = F.find(f => f[0] === L.f) || F[0], rows = inC.filter(cur[2]), sum = rows.reduce((a, x) => a + (x.sisa || 0), 0);
+    h += `<div class="cbar cchips" role="group" aria-label="Pilih center">${['ALL'].concat(DA.CENTERS).map(c => `<button type="button" class="cchip" data-lc="${c}" aria-pressed="${c===center}">${c==='ALL' ? 'Semua' : c}</button>`).join('')}</div>
+      <div class="cbar cchips" role="group" aria-label="Pilih status">${F.map(f => `<button type="button" class="cchip" data-lf="${f[0]}" aria-pressed="${f===cur}">${esc(f[1])} <small>${inC.filter(f[2]).length}</small></button>`).join('')}</div>
+      <p class="note" style="margin:0 0 10px">${R.fmt(rows.length,0)} murid${cur[0]==='ALL' ? '' : ' · ' + esc(cur[1].toLowerCase())}${center==='ALL' ? '' : ' · ' + center} · sisa tagihan ${R.fmtRp(sum)}. Urut dari jatuh tempo paling lama. Data CB Tracker ${esc(shortDate(L.data.at.slice(0,10), t.y))} ${esc(L.data.at.slice(11))}.</p>`;
+    h += rows.length ? `<div class="list">${rows.slice(0, L.show).map(x => itemHtml(x, t)).join('')}</div>` : R.empty('Tidak ada murid', 'Tidak ada murid dengan status ini.');
+    if (rows.length > L.show) h += `<button class="btn" type="button" data-more style="margin-top:10px;width:100%">Tampilkan ${Math.min(STEP, rows.length - L.show)} lagi (${R.fmt(rows.length - L.show,0)} tersisa)</button>`;
+  }
+  el.innerHTML = h;
+}
+$('#cbx').addEventListener('click', e => {
+  const c = e.target.closest('[data-lc]'), f = e.target.closest('[data-lf]');
+  if (c){ DA.center.set(c.dataset.lc); center = c.dataset.lc; L.show = STEP; view.redraw(); drawList(); $('#cbx').scrollIntoView({block: 'start'}); }
+  else if (f){ L.f = f.dataset.lf; DA.lsSet(LIST_KEY, L.f); L.show = STEP; drawList(); }
+  else if (e.target.closest('[data-more]')){ L.show += STEP; drawList(); }
+  else if (e.target.closest('[data-retry]')) loadList(true);
+  else if (e.target.closest('[data-lock]')){ pin = ''; DA.lsSet(DA.PIN_KEY, ''); L.data = null; L.err = ''; L.state = 'pin'; drawList(); }
+});
+$('#cbx').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#cbxPinIn').value.trim();
+  if (v){ pin = v; loadList(); }
+});
+$('#pullBtn').addEventListener('click', () => { if (pin && L.state !== 'loading') loadList(true); });
+loadList();
 const view = R.start({feed: FEED, render, foot: 'Status, sisa tagihan, dan jatuh tempo dihitung dari tab CB Tracker Exboard untuk seluruh histori. Jatuh tempo = 30 hari setelah bayar terakhir. Kurang bayar di bawah Rp 300.000 dianggap lunas (diskon). Daftar nama murid ada di CB Tracker.'});
 })();
 </script>

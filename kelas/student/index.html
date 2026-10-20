@@ -49,11 +49,8 @@
 const R = DA.report, {esc} = DA;
 const $ = s => document.querySelector(s);
 DA.mountNav('kelas-student');
-// Data murid tidak lewat feed publik: app bertanya ke web app Apps Script di Exboard (docs/student/Code.gs),
-// yang hanya membalas bila PIN benar. Dikirim tanpa akun Google (credentials: omit), jadi tidak terpengaruh
-// banyaknya akun Google yang login di HP.
-const API = 'https://script.google.com/macros/s/AKfycbzHc-PlOTKY5QIqG78-P9EgC9dVjeC2qNW-gdSApZy9XK0mV-I9FTgnMv8pv0LdgUUjGQ/exec';
-const PIN_KEY = 'dashboardApp.studentPin';
+// Data murid tidak lewat feed publik: lewat web app Apps Script ber-PIN (DA.privateApi di shell.js).
+const PIN_KEY = DA.PIN_KEY;
 ['#cChips', '#status', '#foot'].forEach(s => { const el = $(s); if (el) el.hidden = true; });
 let pin = DA.lsGet(PIN_KEY) || '', timer = null, names = null;
 // Daftar nama (tanpa data lain) disimpan hanya selama app terbuka (sessionStorage), supaya pencarian langsung di HP
@@ -86,15 +83,7 @@ async function loadList(){
   runSearch();
 }
 
-async function api(action, body){
-  let res;
-  try { res = await fetch(API, {method: 'POST', credentials: 'omit', redirect: 'follow', body: JSON.stringify({action, pin, ...body})}); }
-  catch (e) { throw new Error(navigator.onLine ? 'Tidak bisa menghubungi Apps Script.' : 'HP sedang offline.'); }
-  let j; try { j = await res.json(); } catch (e) { throw new Error('Balasan Apps Script tidak terbaca. Pastikan deployment versi terbaru dengan akses "Anyone".'); }
-  if (!j.ok) throw new Error(j.error || 'Gagal');
-  return j.data;
-}
-const isPinErr = e => /PIN_SALAH/.test(String(e && e.message));
+const api = (action, body) => DA.privateApi(action, pin, body), isPinErr = DA.isPinErr;
 
 $('#view').innerHTML = `
   <form class="stu-pin card" id="pinBox" hidden>

@@ -162,3 +162,5 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 /* Tabel yang sebaiknya muat selebar HP: judul kolom boleh dua baris */
 .tbl-fit .tbl th{white-space:normal;vertical-align:bottom;line-height:1.25}
 .tbl-fit .tbl th,.tbl-fit .tbl td{padding-left:6px;padding-right:6px}
+.met .mv.late{color:var(--crit-ink)}
+.cchip small{font-weight:600;opacity:.75;margin-left:2px}

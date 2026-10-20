@@ -12,6 +12,11 @@ feed publik dan tidak tersimpan di repo ini; PIN juga tidak ada di repo.
 4. Halaman app `kelas/student/` memanggil web app ini lewat `doPost` (tanpa akun Google, jadi aman dari masalah banyak akun di HP).
    URL `/exec`-nya ada di konstanta `API` di halaman itu. Halaman `Index.html` tetap bisa dibuka langsung dari browser.
 
+Web app yang sama juga melayani **daftar murid perlu ditagih** di Cash & Piutang → Cash Bertahap (aksi `cb`):
+murid di tab **CB Tracker** yang belum lunas (kurang bayar di bawah Rp 300.000 dianggap lunas) dan berstatus telat /
+warning / default atau jatuh temponya paling lambat bulan ini. Hanya kolom yang perlu untuk menagih yang dikirim.
+Judul kolom CB Tracker dibaca dari baris 7; jalankan `cekSetup` untuk melihat kolom yang terdeteksi.
+
 Kolom nama anak dideteksi otomatis dari judul kolom (mis. "Kids Name", "Student Name", "Nama Anak").
 Kalau salah, isi `NAME_COL` di bagian atas `Code.gs`. Setelah mengubah kode: Deploy → Manage deployments → edit → Version: New version.
 

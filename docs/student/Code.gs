@@ -50,8 +50,9 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-// API untuk halaman Kelas → Student di app (GitHub Pages). App mengirim POST tanpa akun Google:
-// body JSON {action: 'verify' | 'list' | 'search' | 'detail', pin, q, name, center}; balasan JSON {ok, data} / {ok: false, error}.
+// API untuk halaman Kelas → Student dan Cash & Piutang → Cash Bertahap di app (GitHub Pages). App mengirim POST tanpa
+// akun Google: body JSON {action: 'verify' | 'list' | 'search' | 'detail' | 'cb', pin, q, name, center, fresh};
+// balasan JSON {ok, data} / {ok: false, error}.
 function doPost(e) {
   let out;
   try {
@@ -60,6 +61,7 @@ function doPost(e) {
       : b.action === 'list' ? list(b.pin)
       : b.action === 'search' ? search(b.q, b.pin)
       : b.action === 'detail' ? detail(b.name, b.center, b.pin)
+      : b.action === 'cb' ? cbList(b.pin, b.fresh)
       : (() => { throw new Error('Aksi tidak dikenal'); })();
     out = {ok: true, data};
   } catch (err) {
@@ -174,6 +176,55 @@ function detail(name, center, pin) {
   return res.parts;
 }
 
+// Cash Bertahap: murid yang cicilannya belum lunas dan perlu dipantau (telat / warning / default, atau jatuh tempo
+// berikutnya paling lambat bulan ini), dari tab CB Tracker. Kurang bayar (Total Tagihan − Total Dibayar) di bawah
+// CB.tol dianggap lunas (diskon), sama dengan Feed Cash Bertahap di app.
+const CB = {sheet: 'CB Tracker', headRow: 7, tol: 300000, cacheSec: 300};
+// Kolom dicari lewat judulnya (baris CB.headRow); kalau tidak ketemu dipakai posisi bawaan (A = 1)
+const CB_COLS = {
+  id: [/^sparks id/, 1], nama: [/^nama/, 2], center: [/^center/, 3], paid: [/^total dibayar/, 9], last: [/^bayar terakhir/, 10],
+  days: [/^hari sejak bayar/, 11], due: [/^jatuh tempo/, 12], status: [/^status$/, 13], sd: [/^status student database/, 14],
+  bill: [/^total tagihan/, 16], pkg: [/^package$/, 17], kel: [/kelolosan/, 21]};
+
+function cbCols_(head) {
+  const out = {};
+  Object.keys(CB_COLS).forEach(k => { const [re, pos] = CB_COLS[k]; const j = head.findIndex(h => re.test(h)); out[k] = j >= 0 ? j : pos - 1; });
+  return out;
+}
+
+function cbList(pin, fresh) {
+  checkPin_(pin);
+  const cache = CacheService.getScriptCache(), hit = !fresh && cache.get('cb1');
+  if (hit) return JSON.parse(hit);
+  const ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(CB.sheet);
+  if (!sh) throw new Error('Tab CB Tracker tidak ditemukan.');
+  const tz = ss.getSpreadsheetTimeZone(), lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  const head = sh.getRange(CB.headRow, 1, 1, lastCol).getDisplayValues()[0].map(hkey_), k = cbCols_(head);
+  const vals = lastRow > CB.headRow ? sh.getRange(CB.headRow + 1, 1, lastRow - CB.headRow, lastCol).getValues() : [];
+  // Tanggal bisa berupa Date atau nomor seri Sheets
+  const ymd = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd')
+    : typeof v === 'number' && v > 30000 ? Utilities.formatDate(new Date(Math.round((v - 25569) * 864e5)), 'UTC', 'yyyy-MM-dd') : '';
+  const num = v => typeof v === 'number' && isFinite(v) ? v : null;
+  const txt = v => String(v == null ? '' : v).trim();
+  const month = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+  const rows = [];
+  vals.forEach(r => {
+    const nama = txt(r[k.nama]), center = txt(r[k.center]).toUpperCase();
+    if (!nama || !/^[A-Z]{2,5}$/.test(center)) return;
+    const st = txt(r[k.status]).toUpperCase(), paid = num(r[k.paid]) || 0, bill = num(r[k.bill]);
+    const short = bill > 0 ? bill - paid : null;
+    if (st === 'LUNAS' || (short != null && short < CB.tol)) return;
+    const due = ymd(r[k.due]), late = st === 'TELAT' || st === 'WARNING' || st === 'DEFAULT';
+    if (!late && !(due && due.slice(0, 7) <= month)) return;
+    rows.push([nama, center, st, ymd(r[k.last]), num(r[k.days]), due, short, paid, bill, txt(r[k.pkg]), txt(r[k.sd]),
+      /lolos/i.test(txt(r[k.kel])) ? 1 : 0, txt(r[k.id])]);
+  });
+  const out = {at: Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm'), tol: CB.tol,
+    cols: ['nama', 'center', 'status', 'bayarTerakhir', 'hari', 'jatuhTempo', 'sisa', 'dibayar', 'tagihan', 'package', 'statusSD', 'kelolosan', 'id'], rows};
+  try { const s = JSON.stringify(out); if (s.length < 95000) cache.put('cb1', s, CB.cacheSec); } catch (e) {}
+  return out;
+}
+
 // Jalankan SEKALI dari editor (pilih "pasangPemanasan" → Run): indeks dibangun ulang tiap 30 menit di belakang
 // layar, jadi pencarian dari HP tidak perlu menunggu indeks dibuat.
 function pasangPemanasan() {
@@ -195,4 +246,8 @@ function cekSetup() {
     if (!info) return console.log(`${src}: tab tidak ditemukan.`);
     console.log(`${src}: ${info.lastRow - 1} baris; kolom nama = "${info.nameIdx >= 0 ? info.head[info.nameIdx] : 'TIDAK TERDETEKSI'}"; kolom center = "${info.centerIdx >= 0 ? info.head[info.centerIdx] : '-'}"`);
   });
+  const cb = SpreadsheetApp.getActive().getSheetByName(CB.sheet);
+  if (!cb) return console.log(`${CB.sheet}: tab tidak ditemukan.`);
+  const head = cb.getRange(CB.headRow, 1, 1, cb.getLastColumn()).getDisplayValues()[0], k = cbCols_(head.map(hkey_));
+  console.log(`${CB.sheet}: ${cb.getLastRow() - CB.headRow} baris; kolom: ` + Object.keys(k).map(n => `${n} = "${head[k[n]] || '?'}"`).join(', '));
 }

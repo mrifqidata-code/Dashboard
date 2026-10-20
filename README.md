@@ -10,7 +10,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | | SUNP (show up not paid: alasan belum DP, potential; per center & age group, periode bebas) | `center/sunp/` | Feed SUNP (tab Feed SUNP di Exboard, rumus di `docs/feed-sunp.md`) |
 | | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | Cash & Piutang › Ringkasan (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
-| | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan) | `center/cash/bertahap/` | Feed Cash Bertahap (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`) |
+| | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan, daftar murid perlu ditagih) | `center/cash/bertahap/` | Feed Cash Bertahap (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`); daftar nama lewat Apps Script ber-PIN (`docs/student/`) |
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
 | | Retention per SA Retention (SAR) | `sa/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | PIP (band & status PIP / Watch / OK per advisor) | `sa/pip/` | Feed Dashboard Tambahan (tab 05) |
@@ -69,6 +69,8 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
 - Cash Bertahap: murid dihitung lunas bila LUNAS di CB Tracker atau kurang bayarnya (Total Tagihan − Total Dibayar)
   di bawah Rp 300.000 (diskon). Jatuh tempo = 30 hari setelah bayar terakhir (kolom Jatuh Tempo Berikut CB Tracker);
   "bulan ini" mengikuti tanggal di HP. Tab Ringkasan masih memakai angka tab 12 tanpa aturan selisih itu.
+  Daftar murid di bawahnya (telat / warning / default / tunggakan / jatuh tempo bulan ini) diambil dari Apps Script
+  yang sama dengan halaman Student (aksi `cb`, PIN sama), jadi nama murid tidak pernah lewat feed publik.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.
