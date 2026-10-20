@@ -50,7 +50,7 @@ const R = DA.report, {esc} = DA;
 const $ = s => document.querySelector(s);
 DA.mountNav('center-cash-cb');
 let center = DA.center.get();
-const FEED = {id:'1laDCMsyEZ01UH7p0p__tYAfObydU4HGbcNc_vcFyXTs', name:'Feed Cash Bertahap (dari Exboard)', cache:'dashboardApp.cb.v1'};
+const FEED = {id:'1D8MV8WYBXpV8Y-U7gU3IdFmr2hgV-5bNuMFDtoctfJg', name:'Feed Cash Bertahap v2 (dari Exboard)', cache:'dashboardApp.cb.v2'};
 
 const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 // Status cicilan dari aman ke berisiko; st = nama status di CB Tracker (untuk rentang hari dari tabel C)
@@ -182,11 +182,14 @@ function render(secs){
 // ---- Daftar murid perlu ditagih ----
 // Nama murid tidak lewat feed publik: diambil dari Apps Script ber-PIN (aksi 'cb', PIN sama dengan halaman Student),
 // hanya disimpan di memori selama halaman terbuka. Server sudah membuang yang lunas (termasuk kurang bayar < Rp 300.000).
-const LIST_KEY = 'dashboardApp.cbListFilter', AMT_KEY = 'dashboardApp.cbListAmount', STEP = 50;
+const LIST_KEY = 'dashboardApp.cbListFilter', AMT_KEY = 'dashboardApp.cbListAmount', SM_KEY = 'dashboardApp.cbListActive', STEP = 50;
 // Sisa tagihan kecil sering berupa diskon yang di-approve, jadi bisa disaring: hanya sisa di atas MIN_SISA
 const MIN_SISA = 1000000, AMOUNTS = [['ALL', 'Semua', () => true], ['big', 'Sisa tagihan di atas 1 juta', x => (x.sisa || 0) > MIN_SISA]];
+// Murid default seharusnya Inactive di Student Management; yang masih Active perlu ditangani
+const isActiveDefault = x => x.st === 'DEFAULT' && /^active$/i.test(x.sm || '');
+const ACTIVES = [['ALL', 'Semua', () => true], ['act', 'Default tapi masih Active', isActiveDefault]];
 const ST_LABEL = {'ON TRACK': 'On track', TELAT: 'Telat', WARNING: 'Warning', DEFAULT: 'Default', 'TAGIHAN BELUM ADA': 'Belum ada tagihan', 'BELUM ADA DATA': 'Belum ada data'};
-const L = {state: 'idle', data: null, err: '', show: STEP, f: DA.lsGet(LIST_KEY) || 'ALL', amt: DA.lsGet(AMT_KEY) || 'ALL'};
+const L = {state: 'idle', data: null, err: '', show: STEP, f: DA.lsGet(LIST_KEY) || 'ALL', amt: DA.lsGet(AMT_KEY) || 'ALL', act: DA.lsGet(SM_KEY) || 'ALL'};
 let pin = DA.lsGet(DA.PIN_KEY) || '';
 $('#view').insertAdjacentHTML('afterend', '<section id="cbx" aria-label="Daftar murid perlu ditagih"></section>');
 
@@ -220,13 +223,32 @@ const listFilters = t => [
   ['swarn', 'Sesi warning', x => x.ses.st === 'warning']];
 const shortDate = (s, y) => { if (!s) return '—'; const [yy, mm, dd] = s.split('-').map(Number); return `${dd} ${R.MON[mm-1]}${yy !== y ? ' ' + yy : ''}`; };
 
+// Kolom CB Tracker yang dipakai, dicari lewat judulnya (Apps Script mengirim semua kolom beserta judul)
+const COLS = {n: /^nama/, c: /^center/, st: /^status$/, last: /^bayar terakhir/, days: /^hari sejak bayar/, due: /^jatuh tempo/,
+  paid: /^total dibayar/, bill: /^total tagihan/, pkg: /^package$/, sd: /^status student database/, sm: /^status student management/,
+  id: /^sparks id/, used: /^sesi terpakai/};
+// Apps Script versi sebelumnya mengirim kolom pilihan dengan nama tetap
+const OLD_COLS = {n: 'nama', c: 'center', st: 'status', last: 'bayarTerakhir', days: 'hari', due: 'jatuhTempo', paid: 'dibayar', bill: 'tagihan',
+  pkg: 'package', sd: 'statusSD', id: 'id', used: 'terpakai'};
+const numOrNull = v => typeof v === 'number' && isFinite(v) ? v : null;
+// Tanggal: teks yyyy-mm-dd, atau nomor seri Sheets bila sel bukan berformat tanggal
+const ymd = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : typeof v === 'number' && v > 30000 ? new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10) : '';
 function useList(d){
-  const ix = Object.fromEntries(d.cols.map((c, i) => [c, i])), key = x => x.due || '9999';
-  L.data = {at: d.at, old: !('terpakai' in ix), rows: d.rows.map(r => ({n: r[ix.nama], c: r[ix.center], st: r[ix.status], last: r[ix.bayarTerakhir],
-    days: r[ix.hari], due: r[ix.jatuhTempo], sisa: r[ix.sisa], paid: r[ix.dibayar], bill: r[ix.tagihan], pkg: r[ix.package], sd: r[ix.statusSD],
-    id: r[ix.id], used: r[ix.terpakai]}))
-    .sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.n.localeCompare(b.n))};
-  L.data.rows.forEach(x => { x.ses = sesi(x); });
+  let ix;
+  if (d.head){ const hn = d.head.map(h => String(h).replace(/[*]/g, '').replace(/\s+/g, ' ').trim().toLowerCase());
+    ix = Object.fromEntries(Object.entries(COLS).map(([k, re]) => [k, hn.findIndex(h => re.test(h))])); }
+  else ix = Object.fromEntries(Object.entries(OLD_COLS).map(([k, name]) => [k, d.cols.indexOf(name)]));
+  const get = (r, k) => ix[k] >= 0 ? r[ix[k]] : null, key = x => x.due || '9999';
+  // Kolom yang belum terbaca (Apps Script versi lama, atau judulnya tidak ada di baris 7 CB Tracker)
+  const missing = [['used', 'Sesi Terpakai'], ['sm', 'Status Student Management']].filter(([k]) => !(ix[k] >= 0)).map(([, lab]) => lab);
+  L.data = {at: d.at, missing, rows: d.rows.map(r => {
+    const x = {n: String(get(r, 'n') || ''), c: String(get(r, 'c') || '').toUpperCase(), st: String(get(r, 'st') || '').toUpperCase(),
+      last: ymd(get(r, 'last')), days: numOrNull(get(r, 'days')), due: ymd(get(r, 'due')), paid: numOrNull(get(r, 'paid')) || 0,
+      bill: numOrNull(get(r, 'bill')), pkg: String(get(r, 'pkg') || ''), sd: String(get(r, 'sd') || ''), sm: String(get(r, 'sm') || ''),
+      id: String(get(r, 'id') || ''), used: numOrNull(get(r, 'used'))};
+    x.sisa = x.bill > 0 ? x.bill - x.paid : null; x.ses = sesi(x);
+    return x;
+  }).sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.n.localeCompare(b.n))};
   L.state = 'ok';
 }
 async function loadList(fresh){
@@ -243,9 +265,9 @@ async function loadList(fresh){
 function itemHtml(x, t){
   const tone = x.st === 'DEFAULT' ? 'r' : x.st === 'TELAT' || x.st === 'WARNING' ? 'y' : '';
   const pct = x.bill ? Math.round(x.paid / x.bill * 100) : null, s = x.ses, sTone = s.st === 'lolos' ? 'r' : s.st === 'warning' ? 'y' : '';
-  const extra = [s.per ? `${R.fmtRp(s.per)} per sesi` : '', x.sd ? 'Student Database: ' + x.sd : '', x.id].filter(Boolean).join(' · ');
+  const extra = [s.per ? `${R.fmtRp(s.per)} per sesi` : '', x.sd ? 'Student Database: ' + x.sd : '', x.sm ? 'Student Management: ' + x.sm : '', x.id].filter(Boolean).join(' · ');
   return `<div class="item ${tone}">
-    <div class="item-top"><span class="item-name">${esc(x.n)}</span><span class="item-st"><span class="item-sub"><span class="chip">${esc(x.c)}</span><span class="chip ${tone}">${esc(ST_LABEL[x.st] || x.st || '—')}</span></span>${sTone ? `<span class="chip ${sTone}">Sesi ${s.st}</span>` : ''}</span></div>
+    <div class="item-top"><span class="item-name">${esc(x.n)}</span><span class="item-st"><span class="item-sub"><span class="chip">${esc(x.c)}</span><span class="chip ${tone}">${esc(ST_LABEL[x.st] || x.st || '—')}</span></span>${sTone ? `<span class="chip ${sTone}">Sesi ${s.st}</span>` : ''}${isActiveDefault(x) ? '<span class="chip r" title="Default tapi status Student Management masih Active">Active</span>' : ''}</span></div>
     <div class="mets">
       <div class="met"><div class="ml">Bayar terakhir</div><div class="mv">${shortDate(x.last, t.y)}${x.days!=null ? ` <small>${R.fmt(x.days,0)} hari</small>` : ''}</div></div>
       <div class="met"><div class="ml">Jatuh tempo</div><div class="mv${x.due && x.due < t.today ? ' late' : ''}">${shortDate(x.due, t.y)}</div></div>
@@ -268,16 +290,21 @@ function drawList(){
   } else if (L.state !== 'ok'){
     h += '<div class="skel"></div>';
   } else {
-    // center → nominal → status; angka di tombol status mengikuti pilihan nominal, angka di tombol nominal mengikuti status
+    // Tiga baris pilihan (status, sisa tagihan, Active) saling mempersempit. Angka di tiap tombol = jumlah murid bila
+    // tombol itu dipilih, dengan dua baris lainnya tetap seperti pilihan sekarang.
     const base = L.data.rows.filter(x => (center === 'ALL' || x.c === center) && needed(x, t)), F = listFilters(t);
-    const amt = AMOUNTS.find(a => a[0] === L.amt) || AMOUNTS[0], cur = F.find(f => f[0] === L.f) || F[0];
-    const inC = base.filter(amt[2]), rows = inC.filter(cur[2]), sum = rows.reduce((a, x) => a + (x.sisa || 0), 0);
+    const G = [
+      {attr: 'data-lf', aria: 'Pilih status', opts: F, cur: F.find(f => f[0] === L.f) || F[0]},
+      {attr: 'data-la', aria: 'Pilih sisa tagihan', opts: AMOUNTS, cur: AMOUNTS.find(a => a[0] === L.amt) || AMOUNTS[0]},
+      {attr: 'data-lact', aria: 'Pilih status Student Management', opts: ACTIVES, cur: ACTIVES.find(a => a[0] === L.act) || ACTIVES[0]}];
+    const pass = (x, skip) => G.every(g => g === skip || g.cur[2](x));
+    const rows = base.filter(x => pass(x)), sum = rows.reduce((a, x) => a + (x.sisa || 0), 0);
+    const chosen = G.filter(g => g.cur[0] !== 'ALL').map(g => g.cur[1].toLowerCase());
     h += `<div class="cbar cchips" role="group" aria-label="Pilih center">${['ALL'].concat(DA.CENTERS).map(c => `<button type="button" class="cchip" data-lc="${c}" aria-pressed="${c===center}">${c==='ALL' ? 'Semua' : c}</button>`).join('')}</div>
-      <div class="cbar cchips" role="group" aria-label="Pilih status">${F.map(f => `<button type="button" class="cchip" data-lf="${f[0]}" aria-pressed="${f===cur}">${esc(f[1])} <small>${inC.filter(f[2]).length}</small></button>`).join('')}</div>
-      <div class="cbar cchips" role="group" aria-label="Pilih sisa tagihan">${AMOUNTS.map(a => `<button type="button" class="cchip" data-la="${a[0]}" aria-pressed="${a===amt}">${esc(a[1])} <small>${base.filter(cur[2]).filter(a[2]).length}</small></button>`).join('')}</div>
-      ${L.data.old ? '<div class="notice info">Sesi terpakai belum terbaca karena Apps Script di Exboard masih versi lama. Tempel Code.gs terbaru, lalu Deploy → Manage deployments → edit → Version: New version.</div>' : ''}
-      <p class="note" style="margin:0 0 10px">${R.fmt(rows.length,0)} murid${cur[0]==='ALL' ? '' : ' · ' + esc(cur[1].toLowerCase())}${amt[0]==='ALL' ? '' : ' · sisa di atas Rp 1 jt'}${center==='ALL' ? '' : ' · ' + center} · sisa tagihan ${R.fmtRp(sum)}. Urut dari jatuh tempo paling lama. Data CB Tracker ${esc(shortDate(L.data.at.slice(0,10), t.y))} ${esc(L.data.at.slice(11))}.</p>`;
-    h += rows.length ? `<div class="list">${rows.slice(0, L.show).map(x => itemHtml(x, t)).join('')}</div>` : R.empty('Tidak ada murid', 'Tidak ada murid dengan status ini.');
+      ${G.map(g => `<div class="cbar cchips" role="group" aria-label="${g.aria}">${g.opts.map(o => `<button type="button" class="cchip" ${g.attr}="${o[0]}" aria-pressed="${o===g.cur}">${esc(o[1])} <small>${base.filter(x => pass(x, g) && o[2](x)).length}</small></button>`).join('')}</div>`).join('')}
+      ${L.data.missing.length ? `<div class="notice info">Kolom ${esc(L.data.missing.join(' dan '))} belum terbaca. Pastikan Apps Script di Exboard versi terbaru (tempel Code.gs, lalu Deploy → Manage deployments → edit → Version: New version) dan judul kolomnya ada di baris 7 CB Tracker.</div>` : ''}
+      <p class="note" style="margin:0 0 10px">${R.fmt(rows.length,0)} murid${chosen.map(c => ' · ' + esc(c)).join('')}${center==='ALL' ? '' : ' · ' + center} · sisa tagihan ${R.fmtRp(sum)}. Urut dari jatuh tempo paling lama. Data CB Tracker ${esc(shortDate(L.data.at.slice(0,10), t.y))} ${esc(L.data.at.slice(11))}.</p>`;
+    h += rows.length ? `<div class="list">${rows.slice(0, L.show).map(x => itemHtml(x, t)).join('')}</div>` : R.empty('Tidak ada murid', 'Tidak ada murid dengan pilihan ini.');
     if (rows.length > L.show) h += `<button class="btn" type="button" data-more style="margin-top:10px;width:100%">Tampilkan ${Math.min(STEP, rows.length - L.show)} lagi (${R.fmt(rows.length - L.show,0)} tersisa)</button>`;
   }
   el.innerHTML = h;
@@ -287,6 +314,7 @@ $('#cbx').addEventListener('click', e => {
   if (c){ DA.center.set(c.dataset.lc); center = c.dataset.lc; L.show = STEP; view.redraw(); drawList(); $('#cbx').scrollIntoView({block: 'start'}); }
   else if (f){ L.f = f.dataset.lf; DA.lsSet(LIST_KEY, L.f); L.show = STEP; drawList(); }
   else if (e.target.closest('[data-la]')){ L.amt = e.target.closest('[data-la]').dataset.la; DA.lsSet(AMT_KEY, L.amt); L.show = STEP; drawList(); }
+  else if (e.target.closest('[data-lact]')){ L.act = e.target.closest('[data-lact]').dataset.lact; DA.lsSet(SM_KEY, L.act); L.show = STEP; drawList(); }
   else if (e.target.closest('[data-more]')){ L.show += STEP; drawList(); }
   else if (e.target.closest('[data-retry]')) loadList(true);
   else if (e.target.closest('[data-lock]')){ pin = ''; DA.lsSet(DA.PIN_KEY, ''); L.data = null; L.err = ''; L.state = 'pin'; drawList(); }

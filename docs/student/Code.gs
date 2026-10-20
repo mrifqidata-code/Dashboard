@@ -176,16 +176,15 @@ function detail(name, center, pin) {
   return res.parts;
 }
 
-// Cash Bertahap: semua murid di tab CB Tracker yang cicilannya belum lunas. Kurang bayar (Total Tagihan − Total Dibayar)
-// di bawah CB.tol dianggap lunas (diskon), sama dengan Feed Cash Bertahap di app. App yang memilih siapa yang tampil
-// (telat / tunggakan / jatuh tempo / sesi lolos), jadi aturan itu bisa diubah tanpa deploy ulang Apps Script.
+// Cash Bertahap: semua murid di tab CB Tracker yang cicilannya belum lunas, dengan SEMUA kolomnya beserta judulnya
+// (baris CB.headRow). Kurang bayar (Total Tagihan − Total Dibayar) di bawah CB.tol dianggap lunas (diskon), sama dengan
+// Feed Cash Bertahap di app. App memilih kolom lewat judul dan menentukan siapa yang tampil, jadi kolom baru di
+// CB Tracker atau aturan baru di app tidak perlu deploy ulang Apps Script.
 const CB = {sheet: 'CB Tracker', headRow: 7, tol: 300000, cacheSec: 300};
-// Kolom dicari lewat judulnya (baris CB.headRow); kalau tidak ketemu dipakai posisi bawaan (A = 1)
+// Kolom yang dipakai server sendiri (menyaring yang lunas); kalau judulnya tidak ketemu dipakai posisi bawaan (A = 1)
 const CB_COLS = {
-  id: [/^sparks id/, 1], nama: [/^nama/, 2], center: [/^center/, 3], akad: [/^tgl akad/, 4], paid: [/^total dibayar/, 9],
-  last: [/^bayar terakhir/, 10], days: [/^hari sejak bayar/, 11], due: [/^jatuh tempo/, 12], status: [/^status$/, 13],
-  sd: [/^status student database/, 14], bill: [/^total tagihan/, 16], pkg: [/^package$/, 17], used: [/^sesi terpakai/, 19],
-  eligCB: [/^eligible session/, 20]};
+  nama: [/^nama/, 2], center: [/^center/, 3], paid: [/^total dibayar/, 9], status: [/^status$/, 13],
+  sm: [/^status student management/, 15], bill: [/^total tagihan/, 17]};
 
 // Zona waktu untuk tanggal. Sebagian spreadsheet tidak mengembalikan zona waktunya, jadi pakai zona script, lalu Jakarta.
 const tzOf_ = ss => [() => ss.getSpreadsheetTimeZone(), () => Session.getScriptTimeZone()]
@@ -199,16 +198,16 @@ function cbCols_(head) {
 
 // Hasil disimpan di cache beberapa menit, dipecah per 90 KB (batas 100 KB per kunci)
 function cbCacheGet_() {
-  const cache = CacheService.getScriptCache(), n = cache.get('cb2:n');
+  const cache = CacheService.getScriptCache(), n = cache.get('cb3:n');
   if (!n) return null;
-  const keys = Array.from({length: Number(n)}, (_, i) => 'cb2:' + i), parts = cache.getAll(keys);
+  const keys = Array.from({length: Number(n)}, (_, i) => 'cb3:' + i), parts = cache.getAll(keys);
   return keys.every(key => parts[key] != null) ? JSON.parse(keys.map(key => parts[key]).join('')) : null;
 }
 function cbCachePut_(out) {
   const s = JSON.stringify(out), size = 90000, put = {};
   let n = 0;
-  for (; n * size < s.length; n++) put['cb2:' + n] = s.slice(n * size, (n + 1) * size);
-  put['cb2:n'] = String(n);
+  for (; n * size < s.length; n++) put['cb3:' + n] = s.slice(n * size, (n + 1) * size);
+  put['cb3:n'] = String(n);
   try { CacheService.getScriptCache().putAll(put, CB.cacheSec); } catch (e) {}
 }
 
@@ -219,13 +218,14 @@ function cbList(pin, fresh) {
   const ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(CB.sheet);
   if (!sh) throw new Error('Tab CB Tracker tidak ditemukan.');
   const tz = tzOf_(ss), lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
-  const head = sh.getRange(CB.headRow, 1, 1, lastCol).getDisplayValues()[0].map(hkey_), k = cbCols_(head);
+  const title = sh.getRange(CB.headRow, 1, 1, lastCol).getDisplayValues()[0].map(h => String(h).replace(/\s+/g, ' ').trim());
+  const head = title.map(hkey_), k = cbCols_(head);
+  const keep = head.map((h, j) => j).filter(j => head[j]);   // kolom tanpa judul tidak dikirim
   const vals = lastRow > CB.headRow ? sh.getRange(CB.headRow + 1, 1, lastRow - CB.headRow, lastCol).getValues() : [];
-  // Tanggal bisa berupa Date atau nomor seri Sheets
-  const ymd = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd')
-    : typeof v === 'number' && v > 30000 ? Utilities.formatDate(new Date(Math.round((v - 25569) * 864e5)), 'UTC', 'yyyy-MM-dd') : '';
   const num = v => typeof v === 'number' && isFinite(v) ? v : null;
   const txt = v => String(v == null ? '' : v).trim();
+  // Tanggal → yyyy-MM-dd (zona spreadsheet), angka tetap angka, sisanya teks
+  const cell = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : typeof v === 'number' ? num(v) : txt(v);
   const rows = [];
   vals.forEach(r => {
     const nama = txt(r[k.nama]), center = txt(r[k.center]).toUpperCase();
@@ -233,12 +233,9 @@ function cbList(pin, fresh) {
     const st = txt(r[k.status]).toUpperCase(), paid = num(r[k.paid]) || 0, bill = num(r[k.bill]);
     const short = bill > 0 ? bill - paid : null;
     if (st === 'LUNAS' || (short != null && short < CB.tol)) return;
-    rows.push([nama, center, st, ymd(r[k.last]), num(r[k.days]), ymd(r[k.due]), short, paid, bill, txt(r[k.pkg]), txt(r[k.sd]),
-      txt(r[k.id]), num(r[k.used]), num(r[k.eligCB]), ymd(r[k.akad])]);
+    rows.push(keep.map(j => cell(r[j])));
   });
-  const out = {at: Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm'), tol: CB.tol,
-    cols: ['nama', 'center', 'status', 'bayarTerakhir', 'hari', 'jatuhTempo', 'sisa', 'dibayar', 'tagihan', 'package', 'statusSD',
-      'id', 'terpakai', 'eligibleCB', 'tglAkad'], rows};
+  const out = {at: Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm'), tol: CB.tol, head: keep.map(j => title[j]), rows};
   cbCachePut_(out);
   return out;
 }

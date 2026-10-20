@@ -13,9 +13,10 @@ feed publik dan tidak tersimpan di repo ini; PIN juga tidak ada di repo.
    URL `/exec`-nya ada di konstanta `API` di halaman itu. Halaman `Index.html` tetap bisa dibuka langsung dari browser.
 
 Web app yang sama juga melayani **daftar murid perlu ditagih** di Cash & Piutang → Cash Bertahap (aksi `cb`):
-semua murid di tab **CB Tracker** yang belum lunas (kurang bayar di bawah Rp 300.000 dianggap lunas), hanya kolom yang
-perlu untuk menagih dan menghitung sesi. App yang memilih siapa yang tampil (telat, tunggakan, jatuh tempo, sesi lolos),
-jadi aturan itu bisa diubah tanpa deploy ulang.
+semua murid di tab **CB Tracker** yang belum lunas (kurang bayar di bawah Rp 300.000 dianggap lunas), dengan semua
+kolom CB Tracker beserta judulnya. App memilih kolom lewat judul dan menentukan siapa yang tampil (telat, tunggakan,
+jatuh tempo, sesi lolos, default tapi masih Active), jadi kolom baru di CB Tracker atau aturan baru tidak perlu
+deploy ulang.
 Judul kolom CB Tracker dibaca dari baris 7; jalankan `cekSetup` untuk melihat kolom yang terdeteksi.
 
 Kolom nama anak dideteksi otomatis dari judul kolom (mis. "Kids Name", "Student Name", "Nama Anak").

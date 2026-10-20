@@ -10,7 +10,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | | SUNP (show up not paid: alasan belum DP, potential; per center & age group, periode bebas) | `center/sunp/` | Feed SUNP (tab Feed SUNP di Exboard, rumus di `docs/feed-sunp.md`) |
 | | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | Cash & Piutang › Ringkasan (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
-| | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan, daftar murid perlu ditagih) | `center/cash/bertahap/` | Feed Cash Bertahap (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`); daftar nama lewat Apps Script ber-PIN (`docs/student/`) |
+| | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan, daftar murid perlu ditagih) | `center/cash/bertahap/` | Feed Cash Bertahap v2 (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`); daftar nama lewat Apps Script ber-PIN (`docs/student/`) |
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
 | | Retention per SA Retention (SAR) | `sa/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | PIP (band & status PIP / Watch / OK per advisor) | `sa/pip/` | Feed Dashboard Tambahan (tab 05) |
@@ -75,6 +75,8 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   3 bulan = 12, 6 bulan = 24, 12 bulan = 48. Sesi lolos = Sesi Terpakai CB Tracker melewati eligible; sesi warning =
   sisa eligible 2 sesi atau kurang. Aturan ini ada di halaman (`PKG_SESI`, `WARN_SISA`), bukan di Apps Script.
   Filter nominal "Sisa tagihan di atas 1 juta" (`MIN_SISA`) menyembunyikan sisa kecil yang biasanya diskon ber-approval.
+  Filter "Default tapi masih Active": murid default yang di kolom Status Student Management CB Tracker masih Active
+  (seharusnya Inactive). Apps Script mengirim semua kolom CB Tracker beserta judulnya; halaman memilih kolom lewat judul.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.
