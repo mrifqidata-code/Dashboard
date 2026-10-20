@@ -69,8 +69,11 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
 - Cash Bertahap: murid dihitung lunas bila LUNAS di CB Tracker atau kurang bayarnya (Total Tagihan − Total Dibayar)
   di bawah Rp 300.000 (diskon). Jatuh tempo = 30 hari setelah bayar terakhir (kolom Jatuh Tempo Berikut CB Tracker);
   "bulan ini" mengikuti tanggal di HP. Tab Ringkasan masih memakai angka tab 12 tanpa aturan selisih itu.
-  Daftar murid di bawahnya (telat / warning / default / tunggakan / jatuh tempo bulan ini) diambil dari Apps Script
-  yang sama dengan halaman Student (aksi `cb`, PIN sama), jadi nama murid tidak pernah lewat feed publik.
+  Daftar murid di bawahnya (telat / warning / default / tunggakan / jatuh tempo bulan ini / sesi lolos / sesi warning)
+  diambil dari Apps Script yang sama dengan halaman Student (aksi `cb`, PIN sama), jadi nama murid tidak pernah lewat
+  feed publik. Eligible session = sudah dibayar ÷ (total tagihan ÷ sesi package), dibulatkan ke bawah; sesi package
+  3 bulan = 12, 6 bulan = 24, 12 bulan = 48. Sesi lolos = Sesi Terpakai CB Tracker melewati eligible; sesi warning =
+  sisa eligible 2 sesi atau kurang. Aturan ini ada di halaman (`PKG_SESI`, `WARN_SISA`), bukan di Apps Script.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.

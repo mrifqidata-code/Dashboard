@@ -151,16 +151,6 @@ function render(secs){
       {label:'Sisa berisiko', value: b('Sisa tagihan berisiko (telat + warning + default)'), tone:'r'}].map(x => ({...x, text: R.fmtRp(x.value)})))}
       <p class="note">Sisa tagihan = kekurangan murid yang masih berjalan. Sisa berisiko = bagian dari sisa tagihan milik murid telat, warning, atau default.</p></div></div>`;
 
-  // ---- Kelolosan sesi (bila kolom status Aman/Kelolosan terisi) ----
-  const kelAll = a('Kelolosan sesi (semua)');
-  if (kelAll){
-    const kel = a('Kelolosan sesi (masih berjalan)');
-    html += `<div class="sec-head"><h2>Kelolosan sesi</h2></div><div class="kpis kpis2">
-      ${R.kpi('Murid kelolosan, belum lunas', R.fmt(kel,0), `dari ${R.fmt(kelAll,0)} murid berstatus Kelolosan di CB Tracker`, kel > 0 ? 'r' : 'g')}
-      ${R.kpi('Kelebihan sesi', R.fmt(a('Sesi kelolosan (masih berjalan)'),0), 'sesi terpakai di atas eligible session, murid yang belum lunas')}
-    </div>`;
-  }
-
   // ---- Dibanding tab 16 Cash Bertahap ----
   if (S){
     const s = re => S.val(re, c), add = (p, q) => p==null && q==null ? null : (p || 0) + (q || 0);
@@ -202,6 +192,20 @@ function today0(){
   const now = new Date(), y = now.getFullYear(), m = now.getMonth();
   return {y, today: R.isoDate(now), som: R.isoDate(new Date(y, m, 1)), eom: R.isoDate(new Date(y, m+1, 0))};
 }
+// Sesi package: 3 bulan = 12, 6 bulan = 24, 12 bulan = 48 (4 sesi per bulan). Harga per sesi = total tagihan ÷ sesi package;
+// eligible = sudah dibayar ÷ harga per sesi, dibulatkan ke bawah. Lolos = sesi terpakai melewati eligible;
+// warning = sisa eligible tinggal WARN_SISA sesi atau kurang.
+const PKG_SESI = {3: 12, 6: 24, 12: 48}, WARN_SISA = 2;
+function sesi(x){
+  const m = /(\d+)\s*(month|bulan|bln)/i.exec(x.pkg || ''), months = m ? Number(m[1]) : 0;
+  const total = months ? PKG_SESI[months] || months * 4 : null, ok = total && x.bill > 0;
+  const elig = ok ? Math.min(total, Math.floor(x.paid * total / x.bill + 1e-9)) : null;
+  const st = elig == null || x.used == null ? '' : x.used > elig ? 'lolos' : elig - x.used <= WARN_SISA ? 'warning' : 'aman';
+  return {total, per: ok ? x.bill / total : null, elig, st};
+}
+const isLate = x => x.st === 'TELAT' || x.st === 'WARNING' || x.st === 'DEFAULT';
+// Yang tampil: telat / warning / default, jatuh tempo paling lambat akhir bulan ini, atau sesinya lolos / warning
+const needed = (x, t) => isLate(x) || (!!x.due && x.due <= t.eom) || x.ses.st === 'lolos' || x.ses.st === 'warning';
 // Pilihan status daftar; boleh tumpang-tindih (murid default biasanya juga tunggakan)
 const listFilters = t => [
   ['ALL', 'Semua', () => true],
@@ -209,14 +213,18 @@ const listFilters = t => [
   ['over', 'Tunggakan', x => !!x.due && x.due < t.som],
   ['TELAT', 'Telat', x => x.st === 'TELAT'],
   ['WARNING', 'Warning', x => x.st === 'WARNING'],
-  ['DEFAULT', 'Default', x => x.st === 'DEFAULT']];
+  ['DEFAULT', 'Default', x => x.st === 'DEFAULT'],
+  ['lolos', 'Sesi lolos', x => x.ses.st === 'lolos'],
+  ['swarn', 'Sesi warning', x => x.ses.st === 'warning']];
 const shortDate = (s, y) => { if (!s) return '—'; const [yy, mm, dd] = s.split('-').map(Number); return `${dd} ${R.MON[mm-1]}${yy !== y ? ' ' + yy : ''}`; };
 
 function useList(d){
   const ix = Object.fromEntries(d.cols.map((c, i) => [c, i])), key = x => x.due || '9999';
-  L.data = {at: d.at, rows: d.rows.map(r => ({n: r[ix.nama], c: r[ix.center], st: r[ix.status], last: r[ix.bayarTerakhir], days: r[ix.hari],
-    due: r[ix.jatuhTempo], sisa: r[ix.sisa], paid: r[ix.dibayar], bill: r[ix.tagihan], pkg: r[ix.package], sd: r[ix.statusSD], kel: r[ix.kelolosan], id: r[ix.id]}))
+  L.data = {at: d.at, old: !('terpakai' in ix), rows: d.rows.map(r => ({n: r[ix.nama], c: r[ix.center], st: r[ix.status], last: r[ix.bayarTerakhir],
+    days: r[ix.hari], due: r[ix.jatuhTempo], sisa: r[ix.sisa], paid: r[ix.dibayar], bill: r[ix.tagihan], pkg: r[ix.package], sd: r[ix.statusSD],
+    id: r[ix.id], used: r[ix.terpakai]}))
     .sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.n.localeCompare(b.n))};
+  L.data.rows.forEach(x => { x.ses = sesi(x); });
   L.state = 'ok';
 }
 async function loadList(fresh){
@@ -232,15 +240,17 @@ async function loadList(fresh){
 }
 function itemHtml(x, t){
   const tone = x.st === 'DEFAULT' ? 'r' : x.st === 'TELAT' || x.st === 'WARNING' ? 'y' : '';
-  const pct = x.bill ? Math.round(x.paid / x.bill * 100) : null;
-  const extra = [x.pkg, x.sd ? 'Student Database: ' + x.sd : '', x.kel ? 'Kelolosan sesi' : '', x.id].filter(Boolean).join(' · ');
+  const pct = x.bill ? Math.round(x.paid / x.bill * 100) : null, s = x.ses, sTone = s.st === 'lolos' ? 'r' : s.st === 'warning' ? 'y' : '';
+  const extra = [s.per ? `${R.fmtRp(s.per)} per sesi` : '', x.sd ? 'Student Database: ' + x.sd : '', x.id].filter(Boolean).join(' · ');
   return `<div class="item ${tone}">
-    <div class="item-top"><span class="item-name">${esc(x.n)}</span><span class="item-sub"><span class="chip">${esc(x.c)}</span><span class="chip ${tone}">${esc(ST_LABEL[x.st] || x.st || '—')}</span></span></div>
+    <div class="item-top"><span class="item-name">${esc(x.n)}</span><span class="item-st"><span class="item-sub"><span class="chip">${esc(x.c)}</span><span class="chip ${tone}">${esc(ST_LABEL[x.st] || x.st || '—')}</span></span>${sTone ? `<span class="chip ${sTone}">Sesi ${s.st}</span>` : ''}</span></div>
     <div class="mets">
       <div class="met"><div class="ml">Bayar terakhir</div><div class="mv">${shortDate(x.last, t.y)}${x.days!=null ? ` <small>${R.fmt(x.days,0)} hari</small>` : ''}</div></div>
       <div class="met"><div class="ml">Jatuh tempo</div><div class="mv${x.due && x.due < t.today ? ' late' : ''}">${shortDate(x.due, t.y)}</div></div>
       <div class="met"><div class="ml">Sisa tagihan</div><div class="mv">${R.fmtRp(x.sisa)}</div></div>
       <div class="met"><div class="ml">Sudah dibayar</div><div class="mv">${R.fmtRp(x.paid)}${pct!=null ? ` <small>${pct}%</small>` : ''}</div></div>
+      <div class="met"><div class="ml">Package</div><div class="mv long">${esc(x.pkg || '—')}${s.total ? ` <small>${s.total} sesi</small>` : ''}</div></div>
+      <div class="met"><div class="ml">Terpakai / eligible</div><div class="mv${sTone==='r' ? ' late' : sTone==='y' ? ' warn' : ''}">${x.used==null ? '—' : R.fmt(x.used,0)} / ${s.elig==null ? '—' : R.fmt(s.elig,0)} <small>sesi</small></div></div>
     </div>${extra ? `<p class="note">${esc(extra)}</p>` : ''}</div>`;
 }
 function drawList(){
@@ -256,10 +266,11 @@ function drawList(){
   } else if (L.state !== 'ok'){
     h += '<div class="skel"></div>';
   } else {
-    const inC = L.data.rows.filter(x => center === 'ALL' || x.c === center), F = listFilters(t);
+    const inC = L.data.rows.filter(x => (center === 'ALL' || x.c === center) && needed(x, t)), F = listFilters(t);
     const cur = F.find(f => f[0] === L.f) || F[0], rows = inC.filter(cur[2]), sum = rows.reduce((a, x) => a + (x.sisa || 0), 0);
     h += `<div class="cbar cchips" role="group" aria-label="Pilih center">${['ALL'].concat(DA.CENTERS).map(c => `<button type="button" class="cchip" data-lc="${c}" aria-pressed="${c===center}">${c==='ALL' ? 'Semua' : c}</button>`).join('')}</div>
       <div class="cbar cchips" role="group" aria-label="Pilih status">${F.map(f => `<button type="button" class="cchip" data-lf="${f[0]}" aria-pressed="${f===cur}">${esc(f[1])} <small>${inC.filter(f[2]).length}</small></button>`).join('')}</div>
+      ${L.data.old ? '<div class="notice info">Sesi terpakai belum terbaca karena Apps Script di Exboard masih versi lama. Tempel Code.gs terbaru, lalu Deploy → Manage deployments → edit → Version: New version.</div>' : ''}
       <p class="note" style="margin:0 0 10px">${R.fmt(rows.length,0)} murid${cur[0]==='ALL' ? '' : ' · ' + esc(cur[1].toLowerCase())}${center==='ALL' ? '' : ' · ' + center} · sisa tagihan ${R.fmtRp(sum)}. Urut dari jatuh tempo paling lama. Data CB Tracker ${esc(shortDate(L.data.at.slice(0,10), t.y))} ${esc(L.data.at.slice(11))}.</p>`;
     h += rows.length ? `<div class="list">${rows.slice(0, L.show).map(x => itemHtml(x, t)).join('')}</div>` : R.empty('Tidak ada murid', 'Tidak ada murid dengan status ini.');
     if (rows.length > L.show) h += `<button class="btn" type="button" data-more style="margin-top:10px;width:100%">Tampilkan ${Math.min(STEP, rows.length - L.show)} lagi (${R.fmt(rows.length - L.show,0)} tersisa)</button>`;

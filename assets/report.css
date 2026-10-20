@@ -164,3 +164,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 .tbl-fit .tbl th,.tbl-fit .tbl td{padding-left:6px;padding-right:6px}
 .met .mv.late{color:var(--crit-ink)}
 .cchip small{font-weight:600;opacity:.75;margin-left:2px}
+.item-st{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.item-st .item-sub{margin-left:0}
+.met .mv.long{white-space:normal;font-size:14px;line-height:1.3}
+.met .mv.warn{color:var(--warn-ink)}
