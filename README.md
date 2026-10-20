@@ -74,6 +74,7 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   feed publik. Eligible session = sudah dibayar ÷ (total tagihan ÷ sesi package), dibulatkan ke bawah; sesi package
   3 bulan = 12, 6 bulan = 24, 12 bulan = 48. Sesi lolos = Sesi Terpakai CB Tracker melewati eligible; sesi warning =
   sisa eligible 2 sesi atau kurang. Aturan ini ada di halaman (`PKG_SESI`, `WARN_SISA`), bukan di Apps Script.
+  Filter nominal "Sisa tagihan di atas 1 juta" (`MIN_SISA`) menyembunyikan sisa kecil yang biasanya diskon ber-approval.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.

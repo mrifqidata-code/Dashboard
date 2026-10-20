@@ -182,9 +182,11 @@ function render(secs){
 // ---- Daftar murid perlu ditagih ----
 // Nama murid tidak lewat feed publik: diambil dari Apps Script ber-PIN (aksi 'cb', PIN sama dengan halaman Student),
 // hanya disimpan di memori selama halaman terbuka. Server sudah membuang yang lunas (termasuk kurang bayar < Rp 300.000).
-const LIST_KEY = 'dashboardApp.cbListFilter', STEP = 50;
+const LIST_KEY = 'dashboardApp.cbListFilter', AMT_KEY = 'dashboardApp.cbListAmount', STEP = 50;
+// Sisa tagihan kecil sering berupa diskon yang di-approve, jadi bisa disaring: hanya sisa di atas MIN_SISA
+const MIN_SISA = 1000000, AMOUNTS = [['ALL', 'Semua', () => true], ['big', 'Sisa tagihan di atas 1 juta', x => (x.sisa || 0) > MIN_SISA]];
 const ST_LABEL = {'ON TRACK': 'On track', TELAT: 'Telat', WARNING: 'Warning', DEFAULT: 'Default', 'TAGIHAN BELUM ADA': 'Belum ada tagihan', 'BELUM ADA DATA': 'Belum ada data'};
-const L = {state: 'idle', data: null, err: '', show: STEP, f: DA.lsGet(LIST_KEY) || 'ALL'};
+const L = {state: 'idle', data: null, err: '', show: STEP, f: DA.lsGet(LIST_KEY) || 'ALL', amt: DA.lsGet(AMT_KEY) || 'ALL'};
 let pin = DA.lsGet(DA.PIN_KEY) || '';
 $('#view').insertAdjacentHTML('afterend', '<section id="cbx" aria-label="Daftar murid perlu ditagih"></section>');
 
@@ -266,12 +268,15 @@ function drawList(){
   } else if (L.state !== 'ok'){
     h += '<div class="skel"></div>';
   } else {
-    const inC = L.data.rows.filter(x => (center === 'ALL' || x.c === center) && needed(x, t)), F = listFilters(t);
-    const cur = F.find(f => f[0] === L.f) || F[0], rows = inC.filter(cur[2]), sum = rows.reduce((a, x) => a + (x.sisa || 0), 0);
+    // center → nominal → status; angka di tombol status mengikuti pilihan nominal, angka di tombol nominal mengikuti status
+    const base = L.data.rows.filter(x => (center === 'ALL' || x.c === center) && needed(x, t)), F = listFilters(t);
+    const amt = AMOUNTS.find(a => a[0] === L.amt) || AMOUNTS[0], cur = F.find(f => f[0] === L.f) || F[0];
+    const inC = base.filter(amt[2]), rows = inC.filter(cur[2]), sum = rows.reduce((a, x) => a + (x.sisa || 0), 0);
     h += `<div class="cbar cchips" role="group" aria-label="Pilih center">${['ALL'].concat(DA.CENTERS).map(c => `<button type="button" class="cchip" data-lc="${c}" aria-pressed="${c===center}">${c==='ALL' ? 'Semua' : c}</button>`).join('')}</div>
       <div class="cbar cchips" role="group" aria-label="Pilih status">${F.map(f => `<button type="button" class="cchip" data-lf="${f[0]}" aria-pressed="${f===cur}">${esc(f[1])} <small>${inC.filter(f[2]).length}</small></button>`).join('')}</div>
+      <div class="cbar cchips" role="group" aria-label="Pilih sisa tagihan">${AMOUNTS.map(a => `<button type="button" class="cchip" data-la="${a[0]}" aria-pressed="${a===amt}">${esc(a[1])} <small>${base.filter(cur[2]).filter(a[2]).length}</small></button>`).join('')}</div>
       ${L.data.old ? '<div class="notice info">Sesi terpakai belum terbaca karena Apps Script di Exboard masih versi lama. Tempel Code.gs terbaru, lalu Deploy → Manage deployments → edit → Version: New version.</div>' : ''}
-      <p class="note" style="margin:0 0 10px">${R.fmt(rows.length,0)} murid${cur[0]==='ALL' ? '' : ' · ' + esc(cur[1].toLowerCase())}${center==='ALL' ? '' : ' · ' + center} · sisa tagihan ${R.fmtRp(sum)}. Urut dari jatuh tempo paling lama. Data CB Tracker ${esc(shortDate(L.data.at.slice(0,10), t.y))} ${esc(L.data.at.slice(11))}.</p>`;
+      <p class="note" style="margin:0 0 10px">${R.fmt(rows.length,0)} murid${cur[0]==='ALL' ? '' : ' · ' + esc(cur[1].toLowerCase())}${amt[0]==='ALL' ? '' : ' · sisa di atas Rp 1 jt'}${center==='ALL' ? '' : ' · ' + center} · sisa tagihan ${R.fmtRp(sum)}. Urut dari jatuh tempo paling lama. Data CB Tracker ${esc(shortDate(L.data.at.slice(0,10), t.y))} ${esc(L.data.at.slice(11))}.</p>`;
     h += rows.length ? `<div class="list">${rows.slice(0, L.show).map(x => itemHtml(x, t)).join('')}</div>` : R.empty('Tidak ada murid', 'Tidak ada murid dengan status ini.');
     if (rows.length > L.show) h += `<button class="btn" type="button" data-more style="margin-top:10px;width:100%">Tampilkan ${Math.min(STEP, rows.length - L.show)} lagi (${R.fmt(rows.length - L.show,0)} tersisa)</button>`;
   }
@@ -281,6 +286,7 @@ $('#cbx').addEventListener('click', e => {
   const c = e.target.closest('[data-lc]'), f = e.target.closest('[data-lf]');
   if (c){ DA.center.set(c.dataset.lc); center = c.dataset.lc; L.show = STEP; view.redraw(); drawList(); $('#cbx').scrollIntoView({block: 'start'}); }
   else if (f){ L.f = f.dataset.lf; DA.lsSet(LIST_KEY, L.f); L.show = STEP; drawList(); }
+  else if (e.target.closest('[data-la]')){ L.amt = e.target.closest('[data-la]').dataset.la; DA.lsSet(AMT_KEY, L.amt); L.show = STEP; drawList(); }
   else if (e.target.closest('[data-more]')){ L.show += STEP; drawList(); }
   else if (e.target.closest('[data-retry]')) loadList(true);
   else if (e.target.closest('[data-lock]')){ pin = ''; DA.lsSet(DA.PIN_KEY, ''); L.data = null; L.err = ''; L.state = 'pin'; drawList(); }
