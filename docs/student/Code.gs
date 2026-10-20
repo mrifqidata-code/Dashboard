@@ -186,6 +186,10 @@ const CB_COLS = {
   days: [/^hari sejak bayar/, 11], due: [/^jatuh tempo/, 12], status: [/^status$/, 13], sd: [/^status student database/, 14],
   bill: [/^total tagihan/, 16], pkg: [/^package$/, 17], kel: [/kelolosan/, 21]};
 
+// Zona waktu untuk tanggal. Sebagian spreadsheet tidak mengembalikan zona waktunya, jadi pakai zona script, lalu Jakarta.
+const tzOf_ = ss => [() => ss.getSpreadsheetTimeZone(), () => Session.getScriptTimeZone()]
+  .map(f => { try { return f(); } catch (e) { return ''; } }).find(z => typeof z === 'string' && z) || 'Asia/Jakarta';
+
 function cbCols_(head) {
   const out = {};
   Object.keys(CB_COLS).forEach(k => { const [re, pos] = CB_COLS[k]; const j = head.findIndex(h => re.test(h)); out[k] = j >= 0 ? j : pos - 1; });
@@ -198,7 +202,7 @@ function cbList(pin, fresh) {
   if (hit) return JSON.parse(hit);
   const ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(CB.sheet);
   if (!sh) throw new Error('Tab CB Tracker tidak ditemukan.');
-  const tz = ss.getSpreadsheetTimeZone(), lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  const tz = tzOf_(ss), lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   const head = sh.getRange(CB.headRow, 1, 1, lastCol).getDisplayValues()[0].map(hkey_), k = cbCols_(head);
   const vals = lastRow > CB.headRow ? sh.getRange(CB.headRow + 1, 1, lastRow - CB.headRow, lastCol).getValues() : [];
   // Tanggal bisa berupa Date atau nomor seri Sheets
