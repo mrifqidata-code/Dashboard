@@ -25,6 +25,14 @@
 .subnav .fontbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .subnav span.soon small{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 
+/* Sub-tab di dalam satu sub-menu (mis. Cash & Piutang: Ringkasan / Cash Bertahap) */
+.tabnav{display:flex;gap:4px;margin:0 0 14px;padding:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
+.tabnav a{flex:1 1 0;min-width:0;text-align:center;padding:8px 12px;border-radius:9px;font-weight:600;font-size:14px;color:var(--ink-2);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabnav a:hover{color:var(--ink)}
+.tabnav a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08);outline:1px solid var(--border)}
+.tabnav a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (min-width:761px){ .tabnav{display:inline-flex} .tabnav a{flex:none;min-width:140px} }
+
 .cchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:1px;min-width:0}
 .cchips::-webkit-scrollbar{display:none}
 .cchip{border:1px solid var(--border-2);background:var(--surface);border-radius:999px;padding:5px 12px;font:inherit;font-weight:700;font-size:13px;letter-spacing:.02em;color:var(--ink-2);cursor:pointer;white-space:nowrap;flex:none}

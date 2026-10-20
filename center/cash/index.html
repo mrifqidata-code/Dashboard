@@ -77,11 +77,11 @@ function render(secs){
     <div class="card">${R.bars(comp.map(x => ({...x, text: R.fmtRp(x.value), sub: total ? R.fmtPct(x.value/total*100,0) : ''})))}</div>`;
 
   if (G){
-    const steps = [[/^LUNAS$/i,'Lunas','g'],[/On Track/i,'On track (≤30 hari)',''],[/TELAT/i,'Telat (31–60 hari)','y'],[/WARNING/i,'Warning (61–90 hari)','y'],[/DEFAULT/i,'Default (>90 hari)','r']]
+    const steps = [[/^LUNAS$/i,'Lunas','g'],[/On Track/i,'On track',''],[/TELAT/i,'Telat','y'],[/WARNING/i,'Warning','y'],[/DEFAULT/i,'Default','r']]
       .map(([re, label, tone]) => ({label, tone, value: val(G, re) || 0}));
     const all = val(G, /^Total murid pakai cash bertahap/i) || steps.reduce((a, x) => a + x.value, 0);
     const colors = {g:'var(--good)', '':'var(--accent)', y:'var(--warn)', r:'var(--crit)'};
-    html += `<div class="sec-head"><h2>Cash bertahap · seluruh periode</h2><span class="note" style="margin:0">${R.fmt(all,0)} murid</span></div>
+    html += `<div class="sec-head"><h2>Cash bertahap · seluruh periode</h2><span class="note" style="margin:0">${R.fmt(all,0)} murid · <a href="bertahap/">rincian</a></span></div>
       <div class="grid2"><div class="card"><div class="stack">${steps.map(x => `<i style="width:${all ? x.value/all*100 : 0}%;background:${colors[x.tone]}" title="${esc(x.label)}"></i>`).join('')}</div>
         <div style="margin-top:12px">${R.bars(steps.map(x => ({...x, text:R.fmt(x.value,0), sub: all ? R.fmtPct(x.value/all*100,0) : ''})), {max: all})}</div></div>
       <div class="card"><h3>Nilai</h3>${R.bars([
@@ -93,7 +93,8 @@ function render(secs){
           {label:'Cicilan diterima', value: val(C, /^Cicilan diterima/i), text: R.fmt(val(C, /^Cicilan diterima/i),0) + ' murid'},
           {label:'Pelunasan', value: val(C, /^Pelunasan/i), tone:'g', text: R.fmt(val(C, /^Pelunasan/i),0) + ' murid'},
           {label:'DP belum FP', value: val(C, /^Murid berstatus DP/i), tone:'y', text: R.fmt(val(C, /^Murid berstatus DP/i),0) + ' murid'}])}` : ''}
-      </div></div>`;
+      </div></div>
+      <p class="note">Angka bagian ini dari tab 12 Cash & Piutang Exboard dan belum memakai aturan selisih di bawah Rp 300.000. Status terbaru dan jatuh tempo bulan ini ada di tab <a href="bertahap/">Cash Bertahap</a>.</p>`;
   }
   if (F){
     const pa = val(F, /^% AKAD DARI TOTAL AKUISISI/i);

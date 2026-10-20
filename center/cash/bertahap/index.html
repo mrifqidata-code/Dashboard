@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cash Bertahap</title>
+<meta name="description" content="Cicilan cash bertahap per center: jatuh tempo bulan ini, tunggakan, status, dan sisa tagihan.">
+<link rel="manifest" href="../../../manifest.webmanifest">
+<link rel="icon" href="../../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../../apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../../../assets/shell.css">
+<link rel="stylesheet" href="../../../assets/report.css">
+</head>
+<body class="cat-center">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+    <div class="brand">
+      <h1>Cash & Piutang</h1>
+      <p id="sub">Cash Bertahap</p>
+    </div>
+    <div class="right">
+      <span class="sync" id="status">Memuat…</span>
+      <button class="btn icon" id="pullBtn" type="button" aria-label="Tarik ulang data"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cbar" id="cChips"></div>
+  <div class="notice" id="errBox" hidden></div>
+  <div id="view"><div class="skel"></div><div class="skel"></div></div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script src="../../../assets/shell.js"></script>
+<script src="../../../assets/report.js"></script>
+<script>
+(function(){
+'use strict';
+const R = DA.report, {esc} = DA;
+const $ = s => document.querySelector(s);
+DA.mountNav('center-cash-cb');
+let center = DA.center.get();
+const FEED = {id:'1laDCMsyEZ01UH7p0p__tYAfObydU4HGbcNc_vcFyXTs', name:'Feed Cash Bertahap (dari Exboard)', cache:'dashboardApp.cb.v1'};
+
+const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+// Status cicilan dari aman ke berisiko; st = nama status di CB Tracker (untuk rentang hari dari tabel C)
+const STEPS = [
+  {k:'Lunas', label:'Lunas', tone:'g', color:'var(--good)'},
+  {k:'On track', st:'ON TRACK', label:'On track', tone:'', color:'var(--accent)'},
+  {k:'Telat', st:'TELAT', label:'Telat', tone:'y', color:'var(--warn)'},
+  {k:'Warning', st:'WARNING', label:'Warning', tone:'s', color:'var(--serious)'},
+  {k:'Default', st:'DEFAULT', label:'Default', tone:'r', color:'var(--crit)'},
+  {k:'Lainnya', label:'Belum ada tagihan', tone:'n', color:'var(--muted)'}
+];
+const pad2 = n => String(n).padStart(2, '0');
+const add3 = (...v) => v.reduce((t, x) => t + (x || 0), 0);
+// Nilai di sebelah label, mis. "Bayar terakhir paling baru:"
+function after(sec, re){ for (const r of sec || []) { const i = r.findIndex(x => re.test(x || '')); if (i >= 0) return r[i+1] || ''; } return ''; }
+// Tabel per tanggal (D, E): jumlah kolom `col` untuk tanggal from..to (yyyy-mm-dd, inklusif; null = tanpa batas)
+function sumDates(t, col, from, to){
+  if (!t || t.idx(col) < 0) return null;
+  let s = 0;
+  t.rows.forEach(r => { const d = R.toIso(r[t.col]); if (d && (!from || d >= from) && (!to || d <= to)) s += R.num(t.get(r, col)) || 0; });
+  return s;
+}
+
+function render(secs){
+  center = DA.centerChips($('#cChips'), DA.CENTERS, c => { center = c; view.redraw(); });
+  const cb = secs['CB Tracker'], six = secs['16 Cash Bertahap'];
+  const A = R.table(cb, /^A\. STATUS CICILAN/i), B = R.table(cb, /^B\. NILAI/i), C = R.table(cb, /^C\. HARI SEJAK BAYAR/i),
+        D = R.table(cb, /^D\. JATUH TEMPO/i), E = R.table(cb, /^E\. BAYAR TERAKHIR/i), S = R.table(six, /^A\. STATUS CASH BERTAHAP/i);
+  if (!A) return R.empty('Tabel cash bertahap belum terbaca', 'Bagian "A. Status cicilan" tidak ditemukan di Feed Cash Bertahap.');
+  const c = center, key = c==='ALL' ? 'TOTAL' : c, scope = c==='ALL' ? 'semua center' : c;
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), today = R.isoDate(now);
+  const day = (yy, mm, dd) => R.isoDate(new Date(yy, mm, dd));
+  const som = day(y, m, 1), eom = day(y, m+1, 0), nsom = day(y, m+1, 1), neom = day(y, m+2, 0), psom = day(y, m-1, 1), peom = day(y, m, 0);
+  const month = `${BULAN[m]} ${y}`;
+  const dataDate = R.toIso(after(cb, /^Bayar terakhir paling baru/i));
+  $('#sub').textContent = `Cicilan ${month}${dataDate ? ' · data s.d. ' + R.niceDate(dataDate) : ''}${c==='ALL' ? '' : ' · ' + c}`;
+
+  const a = (k, x) => A.val(k, x || c), b = (k, x) => B ? B.val(k, x || c) : null;
+  // Cicilan bulan berjalan untuk satu center (ALL = TOTAL), dari tabel per tanggal D dan E
+  const month0 = x => { const k = x==='ALL' ? 'TOTAL' : x; return {
+    due: sumDates(D, k, som, eom), late: sumDates(D, k, som, R.addDays(today, -1)), over: sumDates(D, k, null, peom),
+    next: sumDates(D, k, nsom, neom), dueRp: sumDates(D, 'Rp ' + k, som, eom), overRp: sumDates(D, 'Rp ' + k, null, peom),
+    paid: sumDates(E, k, som, eom), paidLunas: sumDates(E, 'Lunas ' + k, som, eom), paidPrev: sumDates(E, k, psom, peom)}; };
+  const M = month0(c);
+  const total = a('Total murid'), aktif = a('Masih berjalan'), sisa = b('Sisa tagihan (masih berjalan)');
+  const overShare = aktif && M.over!=null ? M.over / aktif * 100 : null;
+  let html = `<div class="kpis">
+    ${R.kpi('Jatuh tempo bulan ini', R.fmt(M.due,0), M.due==null ? '' : `murid belum bayar · ${R.fmt(M.late,0)} sudah lewat tanggalnya`)}
+    ${R.kpi('Tunggakan', R.fmt(M.over,0), `jatuh tempo sebelum ${esc(BULAN[m])} · sisa ${R.fmtRp(M.overRp)}`, overShare==null ? '' : overShare > 30 ? 'r' : overShare > 15 ? 'y' : 'g')}
+    ${R.kpi('Sudah bayar bulan ini', R.fmt(M.paid,0), M.paid==null ? '' : `murid · ${R.fmt(M.paidLunas,0)} di antaranya lunas`)}
+    ${R.kpi('Sisa tagihan', R.fmtRp(sisa), `${R.fmt(aktif,0)} murid masih berjalan`)}
+  </div>`;
+
+  // ---- Cicilan bulan berjalan ----
+  html += `<div class="sec-head"><h2>Cicilan ${esc(month)} · ${esc(scope)}</h2></div>`;
+  if (c==='ALL'){
+    const cols = DA.CENTERS.concat(['ALL']);
+    html += `<div class="tbl-fit">${R.tbl(['Center','Jatuh tempo','Sudah lewat','Tunggakan','Sudah bayar'], cols.map(x => { const v = month0(x); return {
+      cls: x==='ALL' ? 'tot' : '', tones: ['', '', v.late ? 'y' : '', v.over ? 'r' : '', 'g'],
+      cells: [x==='ALL' ? 'TOTAL' : x, R.fmt(v.due,0), R.fmt(v.late,0), R.fmt(v.over,0), R.fmt(v.paid,0)]}; }))}</div>`
+      + `<p class="note">Jumlah murid. Jatuh tempo = belum bayar dan jatuh temponya bulan ini; sudah lewat = bagian dari jatuh tempo yang tanggalnya sebelum hari ini. Tunggakan = jatuh temponya sebelum bulan ini dan belum bayar lagi. Sudah bayar = bayar terakhirnya bulan ini.</p>`;
+  }
+  const weeks = [[1,7],[8,14],[15,21],[22,0]].map(([d1, d2]) => {
+    const from = som.slice(0,8) + pad2(d1), to = d2 ? som.slice(0,8) + pad2(d2) : eom;
+    return {label: `Tgl ${d1}–${Number(to.slice(8))}`, value: sumDates(D, key, from, to), rp: sumDates(D, 'Rp ' + key, from, to), past: to < today};
+  });
+  html += `<div class="grid2"${c==='ALL' ? ' style="margin-top:12px"' : ''}>
+    <div class="card"><h3>Bulan ini</h3>${R.bars([
+      {label:'Jatuh tempo', value: M.due, tone:'y'},
+      {label:'Lewat tanggal', value: M.late, tone:'r'},
+      {label:'Tunggakan', value: M.over, tone:'r'},
+      {label:'Sudah bayar', value: M.paid, tone:'g'},
+      {label:'Bulan depan', value: M.next, tone:'n'}].map(x => ({...x, text: R.fmt(x.value,0)})))}
+      <p class="note">Sudah bayar bulan lalu: ${R.fmt(M.paidPrev,0)} murid. Sisa tagihan murid yang jatuh tempo bulan ini ${R.fmtRp(M.dueRp)}.</p></div>
+    <div class="card"><h3>Jatuh tempo per pekan</h3>${R.bars(weeks.map(w => ({label: w.label, value: w.value, tone: w.past ? 'r' : 'y', text: R.fmt(w.value,0), sub: R.fmtRp(w.rp)})))}
+      <p class="note">Murid yang belum bayar, menurut tanggal jatuh temponya. Nominal = sisa tagihan murid tersebut, bukan besar cicilannya. Merah = tanggalnya sudah lewat.</p></div>
+  </div>`;
+
+  // ---- Status seluruh periode ----
+  const rng = st => {
+    const r = C && C.row(st); if (!r) return '';
+    const lo = R.num(C.get(r, 'Min hari')), hi = R.num(C.get(r, 'Max hari'));
+    if (lo==null || hi==null) return '';
+    return st==='ON TRACK' ? `≤${hi} hari` : st==='DEFAULT' ? `>${lo-1} hari` : `${lo}–${hi} hari`;
+  };
+  const steps = STEPS.map(s => ({...s, value: a(s.k) || 0, range: s.st ? rng(s.st) : ''}));
+  const tol = a('Lunas karena selisih < 300rb'), disc = b('Selisih dianggap diskon (< 300rb)');
+  const ranges = steps.filter(x => x.range).map(x => `${x.label.toLowerCase()} ${x.range}`).join(', ');
+  html += `<div class="sec-head"><h2>Status cicilan · seluruh periode</h2><span class="note" style="margin:0">${R.fmt(total,0)} murid</span></div>
+    <div class="grid2"><div class="card"><div class="stack">${steps.map(x => `<i style="width:${total ? x.value/total*100 : 0}%;background:${x.color}" title="${esc(x.label)}: ${R.fmt(x.value,0)}"></i>`).join('')}</div>
+      <div style="margin-top:12px">${R.bars(steps.map(x => ({label: x.label, value: x.value, tone: x.tone, text: R.fmt(x.value,0), sub: total ? R.fmtPct(x.value/total*100,0) : ''})), {max: total})}</div>
+      ${ranges ? `<p class="note">Hari sejak bayar terakhir: ${esc(ranges)}.</p>` : ''}
+      ${tol ? `<p class="note">Lunas termasuk ${R.fmt(tol,0)} murid yang kurang bayar di bawah Rp 300.000 (dianggap diskon, total ${R.fmtRp(disc)}).</p>` : ''}</div>
+    <div class="card"><h3>Nilai</h3>${R.bars([
+      {label:'Total tagihan', value: b('Total tagihan')},
+      {label:'Sudah dibayar', value: b('Sudah dibayar'), tone:'g'},
+      {label:'Sisa tagihan', value: sisa, tone:'y'},
+      {label:'Sisa berisiko', value: b('Sisa tagihan berisiko (telat + warning + default)'), tone:'r'}].map(x => ({...x, text: R.fmtRp(x.value)})))}
+      <p class="note">Sisa tagihan = kekurangan murid yang masih berjalan. Sisa berisiko = bagian dari sisa tagihan milik murid telat, warning, atau default.</p></div></div>`;
+
+  // ---- Kelolosan sesi (bila kolom status Aman/Kelolosan terisi) ----
+  const kelAll = a('Kelolosan sesi (semua)');
+  if (kelAll){
+    const kel = a('Kelolosan sesi (masih berjalan)');
+    html += `<div class="sec-head"><h2>Kelolosan sesi</h2></div><div class="kpis kpis2">
+      ${R.kpi('Murid kelolosan, belum lunas', R.fmt(kel,0), `dari ${R.fmt(kelAll,0)} murid berstatus Kelolosan di CB Tracker`, kel > 0 ? 'r' : 'g')}
+      ${R.kpi('Kelebihan sesi', R.fmt(a('Sesi kelolosan (masih berjalan)'),0), 'sesi terpakai di atas eligible session, murid yang belum lunas')}
+    </div>`;
+  }
+
+  // ---- Dibanding tab 16 Cash Bertahap ----
+  if (S){
+    const s = re => S.val(re, c), add = (p, q) => p==null && q==null ? null : (p || 0) + (q || 0);
+    const rows = [
+      ['Total murid', total, s(/^Total murid/i)],
+      ['Lunas', a('Lunas'), s(/^LUNAS$/i)],
+      ['Masih berjalan', aktif, s(/^Masih berjalan/i)],
+      ['On track', a('On track'), s(/^ON TRACK/i)],
+      ['Telat (31–60 hari)', add(a('Telat'), a('Warning')), s(/^TELAT/i)],
+      ['Lebih dari 60 hari', a('Default'), s(/^WARNING/i)]].map(r => ({cells: [esc(r[0]), R.fmt(r[1],0), R.fmt(r[2],0)]}));
+    const rp = [
+      ['Sisa tagihan', sisa, s(/^Sisa tagihan belum lunas/i)],
+      ['Sisa berisiko', b('Sisa tagihan berisiko (telat + warning + default)'), s(/^Sisa tagihan BERISIKO/i)]].map(r => ({cells: [esc(r[0]), R.fmtRp(r[1]), R.fmtRp(r[2])]}));
+    html += `<div class="sec-head"><h2>Dibanding tab 16 Cash Bertahap</h2></div><div class="tbl-fit">${R.tbl(['', 'CB Tracker', '16 Cash Bertahap'], rows.concat(rp))}</div>`
+      + `<p class="note">16 Cash Bertahap menganggap lunas bila sudah ada transaksi Pelunasan; telat = 31–60 hari dan warning / gagal bayar = lebih dari 60 hari sejak bayar terakhir. CB Tracker membandingkan total bayar dengan total tagihan (di sini kurang bayar di bawah Rp 300.000 ikut lunas)${ranges ? `; statusnya: ${esc(ranges)}` : ''}.</p>`;
+  }
+
+  // ---- Per center ----
+  if (c==='ALL'){
+    const cols = DA.CENTERS.concat(['ALL']);
+    html += `<div class="sec-head"><h2>Per center · seluruh periode</h2></div><div class="tbl-fit">` + R.tbl(['Center','Murid','Berjalan','Bermasalah','Sisa tagihan'], cols.map(x => {
+      const tot = a('Total murid', x), bad = add3(a('Telat', x), a('Warning', x), a('Default', x)), pct = tot ? bad / tot * 100 : null;
+      return {cls: x==='ALL' ? 'tot' : '', tones: ['', '', '', pct==null ? '' : pct > 30 ? 'r' : pct > 15 ? 'y' : 'g', ''],
+        cells: [x==='ALL' ? 'TOTAL' : x, R.fmt(tot,0), R.fmt(a('Masih berjalan', x),0), R.fmtPct(pct), R.fmtRp(b('Sisa tagihan (masih berjalan)', x))]};
+    })) + `</div><p class="note">Berjalan = belum lunas. Bermasalah = telat + warning + default, dibagi total murid cash bertahap center itu.</p>`;
+  }
+  return html;
+}
+const view = R.start({feed: FEED, render, foot: 'Status, sisa tagihan, dan jatuh tempo dihitung dari tab CB Tracker Exboard untuk seluruh histori. Jatuh tempo = 30 hari setelah bayar terakhir. Kurang bayar di bawah Rp 300.000 dianggap lunas (diskon). Daftar nama murid ada di CB Tracker.'});
+})();
+</script>
+</body>
+</html>

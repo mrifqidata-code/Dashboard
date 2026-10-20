@@ -231,10 +231,12 @@ function start(page){
   document.addEventListener('visibilitychange', () => { if (document.visibilityState==='visible' && (!data || Date.now() - data.pulledAt > STALE_MS)) pull(); });
   const c = lsGet(FEED.cache);
   if (c && typeof c.text==='string' && load(c.text, c.pulledAt)==='ok') setStatus('', 'Data ' + fmtTime(c.pulledAt));
-  draw(); pull();
+  // Gambar data tersimpan setelah skrip halaman selesai: konstanta yang dideklarasikan sesudah R.start sudah siap,
+  // dan tanpa data tersimpan kerangka loading tetap tampil selama penarikan pertama.
+  pull(); Promise.resolve().then(draw);
   return {redraw: draw};
 }
 
 window.DA.report = {T, num, fmt, fmtPct, fmtRp, sections, table, monthOf, kpi, bars, tbl, empty, start,
-  MON, niceDate, niceRange, dayLabel, monthLabel, toIso, period, ageName, ageSort, ageChips, pickChips, toTime, timeSort};
+  MON, isoDate, addDays, niceDate, niceRange, dayLabel, monthLabel, toIso, period, ageName, ageSort, ageChips, pickChips, toTime, timeSort};
 })();

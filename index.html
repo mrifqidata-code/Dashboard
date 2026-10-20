@@ -18,7 +18,7 @@
   // Nilai lama ('rekap', 'slot-map', 'sa') dari versi sebelumnya ikut dipetakan
   var map = {'rekap':'center/', 'slot-map':'kelas/', 'sa':'sa/'};
   if (map[last]) last = map[last];
-  if (!/^(center|sa|kelas)\/([a-z-]+\/)?$/.test(last || '')) last = 'center/';
+  if (!/^(center|sa|kelas)\/([a-z-]+\/){0,2}$/.test(last || '')) last = 'center/';
   location.replace(last);
 })();
 </script>

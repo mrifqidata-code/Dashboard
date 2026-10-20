@@ -9,7 +9,8 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | | Class Trial (booking → confirmed → show up → paid DP / regis full; per center & age group, periode bebas) | `center/trial/` | Feed Class Trial (QUERY atas sheet Class Trial) |
 | | SUNP (show up not paid: alasan belum DP, potential; per center & age group, periode bebas) | `center/sunp/` | Feed SUNP (tab Feed SUNP di Exboard, rumus di `docs/feed-sunp.md`) |
 | | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
-| | Cash & Piutang (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
+| | Cash & Piutang › Ringkasan (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
+| | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan) | `center/cash/bertahap/` | Feed Cash Bertahap (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`) |
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
 | | Retention per SA Retention (SAR) | `sa/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | PIP (band & status PIP / Watch / OK per advisor) | `sa/pip/` | Feed Dashboard Tambahan (tab 05) |
@@ -18,7 +19,8 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | | Coach (beban murid, sesi per hari, level murid) | `kelas/coach/` | Feed Dashboard Tambahan (tab 11, dan tabel G tab 08) |
 
 - `assets/shell.js` + `assets/shell.css`: menu kategori & sub-menu (daftar di `NAV`), filter center bersama,
-  dan utilitas baca Sheet (`DA.fetchPublicCsv`, `DA.parseCSV`, `DA.sheetNum`).
+  dan utilitas baca Sheet (`DA.fetchPublicCsv`, `DA.parseCSV`, `DA.sheetNum`). Sub-menu boleh punya `tabs`
+  (sub-tab, mis. Cash & Piutang: Ringkasan / Cash Bertahap); tiap tab halaman sendiri dengan `DA.mountNav('<id tab>')`.
 - `assets/report.js` + `assets/report.css`: dipakai keenam sub-menu yang membaca **Feed Dashboard Tambahan**.
   Feed itu memuat beberapa tab Exboard berdampingan; baris 1 berisi penanda `##<nama tab>` di kolom awal tiap tab.
   Tabel dicari lewat judulnya ("A. …", "B. …") dan kolom lewat nama header, jadi menggeser baris di Exboard aman
@@ -64,6 +66,9 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   Little (3-5 Yo), Kids (5-8+ Yo), Star (9-12 Yo). Periode cepat (Hari ini … Bulan lalu) dihitung ulang setiap dibuka;
   tanggal bebas diingat di perangkat. Rentang ≤31 hari dirinci per hari, lebih panjang per bulan.
 - SA Retention: tab 03 belum mencatat center tiap SAR, jadi halaman itu selalu menampilkan semua center.
+- Cash Bertahap: murid dihitung lunas bila LUNAS di CB Tracker atau kurang bayarnya (Total Tagihan − Total Dibayar)
+  di bawah Rp 300.000 (diskon). Jatuh tempo = 30 hari setelah bayar terakhir (kolom Jatuh Tempo Berikut CB Tracker);
+  "bulan ini" mengikuti tanggal di HP. Tab Ringkasan masih memakai angka tab 12 tanpa aturan selisih itu.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.

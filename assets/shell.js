@@ -10,13 +10,16 @@ const ICON = {
   kelas: '<svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 4v16M16 4v16"/></svg>'
 };
 // Kategori (menu bawah) dan sub-menu (menu atas). Sub-menu tanpa href = belum tersedia.
+// tabs = sub-tab di dalam satu sub-menu (baris tab di atas halaman); tab pertama = halaman sub-menu itu sendiri.
 const NAV = [
   {id:'center', label:'Center', subs:[
     {id:'center', label:'Rekap Acquisition', href:'center/'},
     {id:'center-trial', label:'Class Trial', href:'center/trial/'},
     {id:'center-sunp', label:'SUNP', href:'center/sunp/'},
     {id:'center-retention', label:'Retention', href:'center/retention/'},
-    {id:'center-cash', label:'Cash & Piutang', href:'center/cash/'}]},
+    {id:'center-cash', label:'Cash & Piutang', href:'center/cash/', tabs:[
+      {id:'center-cash', label:'Ringkasan', href:'center/cash/'},
+      {id:'center-cash-cb', label:'Cash Bertahap', href:'center/cash/bertahap/'}]}]},
   {id:'sa', label:'Student Advisor', short:'SA', subs:[
     {id:'sa', label:'Acquisition', href:'sa/'},
     {id:'sa-retention', label:'Retention', href:'sa/retention/'},
@@ -133,7 +136,9 @@ font.apply(font.get());
 
 /* ---------- Navigasi ---------- */
 function mountNav(pageId){
-  const cat = NAV.find(c => c.subs.some(s => s.id===pageId)) || NAV[0];
+  const owns = s => s.id===pageId || (s.tabs || []).some(t => t.id===pageId);
+  const cat = NAV.find(c => c.subs.some(owns)) || NAV[0];
+  const cur = cat.subs.find(owns);
   const top = document.querySelector('.top-inner');
   if (top){
     const nav = document.createElement('nav');
@@ -147,7 +152,7 @@ function mountNav(pageId){
     const sub = document.createElement('nav');
     sub.className = 'subnav'; sub.setAttribute('aria-label', cat.label);
     sub.innerHTML = `<div class="wrap">${cat.subs.map(s => s.href
-      ? `<a href="${/^https?:/.test(s.href) ? s.href : ROOT + s.href}"${s.id===pageId ? ' aria-current="page"' : ''}>${esc(s.label)}</a>`
+      ? `<a href="${/^https?:/.test(s.href) ? s.href : ROOT + s.href}"${s===cur ? ' aria-current="page"' : ''}>${esc(s.label)}</a>`
       : `<span class="soon" title="Segera hadir">${esc(s.label)} <small>segera</small></span>`).join('')}<button type="button" class="fontbtn" title="Ganti font (uji coba)"></button></div>`;
     header.insertAdjacentElement('afterend', sub);
     const fb = sub.querySelector('.fontbtn');
@@ -155,7 +160,14 @@ function mountNav(pageId){
     fb.addEventListener('click', () => { font.set(font.get()==='jakarta' ? 'poppins' : 'jakarta'); label(); });
     label();
   }
-  const me = cat.subs.find(s => s.id===pageId);
+  const main = document.querySelector('main');
+  if (cur && cur.tabs && main){
+    const tabs = document.createElement('nav');
+    tabs.className = 'tabnav'; tabs.setAttribute('aria-label', cur.label);
+    tabs.innerHTML = cur.tabs.map(t => `<a href="${ROOT + t.href}"${t.id===pageId ? ' aria-current="page"' : ''}>${esc(t.label)}</a>`).join('');
+    main.insertAdjacentElement('afterbegin', tabs);
+  }
+  const me = cur && cur.tabs ? cur.tabs.find(t => t.id===pageId) : cur;
   if (me && me.href) { try { localStorage.setItem('dashboardApp.last', me.href); } catch(e){} }
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register(ROOT + 'sw.js').catch(() => {});
 }
