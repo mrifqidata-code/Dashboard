@@ -57,6 +57,9 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
 - Warna di halaman SA: CVR / CVR Baby Tiny / Full Pay Rate hijau bila ≥ rata-rata area, merah bila 30% di bawahnya.
 - CVR Baby Tiny = (paid Baby + paid Tiny) / (show up Baby + show up Tiny), dari bagian B tab 02B
   (paid per segmen = show up × CVR segmen). Kolom BT di sheet tidak dipakai karena pembaginya berbeda.
+- Rekap: opsi Revenue **Semua / Tanpa cicilan & pelunasan** (di atas pilihan center) berlaku untuk harian, mingguan dan
+  bulanan. "Tanpa" mengeluarkan transaksi Revenue Record bertipe Cash Bertahap: Cicilan dan Cash Bertahap: Pelunasan;
+  akad tetap dihitung dan target revenue tetap sama. Butuh kolom Revenue CB Cicilan / Pelunasan di Feed Harian.
 - Rekap: begitu tab **Feed Harian** di Exboard terisi (rumus di `docs/feed-harian.md`),
   harian, mingguan dan bulanan semuanya dihitung dari tabel itu (Acquisition = FP SD, Revenue dari Revenue Record).
   Sebelum itu: mingguan dari feed mingguan (Acquisition = Paid DP + Paid Full), bulanan dari tab 02 Acquisition

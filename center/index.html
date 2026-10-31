@@ -107,6 +107,13 @@ input[type=date][hidden],select[hidden]{display:none}
 @media (max-width:600px){ .seg{flex:1 1 100%} .seg button{flex:1} }
 .notice.info{background:var(--accent-soft);color:var(--ink)}
 .cbar{margin:0 0 14px}
+/* Opsi revenue: dengan / tanpa cicilan & pelunasan Cash Bertahap */
+.revbar{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:0 0 12px}
+.revbar[hidden],.revbar [hidden]{display:none}
+.revbar .rb-label{font-size:12.5px;font-weight:650;color:var(--ink-2)}
+.revbar .rb-hint{font-size:12px;color:var(--muted);flex:1 1 220px}
+.seg button:disabled{opacity:.45;cursor:not-allowed}
+@media (max-width:600px){ .revbar .seg{flex:1 1 auto} .revbar .seg button{flex:1 1 auto;line-height:1.25} }
 
 main{padding-top:16px}
 .notice{border-radius:12px;padding:12px 14px;font-size:13.5px;background:var(--warn-bg);color:var(--warn-ink);margin-bottom:14px}
@@ -126,6 +133,7 @@ main{padding-top:16px}
 .kpi .k-val{font-size:24px;font-weight:700;letter-spacing:-.02em;margin:4px 0 6px;line-height:1.1;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .kpi .k-val small{font-size:14px;font-weight:600;color:var(--ink-2);letter-spacing:0}
 .kpi .k-foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.kpi .k-sub{flex-basis:100%;color:var(--muted)}
 
 /* Badges: icon + label, not color alone */
 .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px 2px 3px;border-radius:999px;font-size:12.5px;font-weight:650;white-space:nowrap;line-height:1.5}
@@ -222,6 +230,14 @@ table.trend{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5p
 </div>
 
 <main class="wrap">
+  <div class="revbar" id="revBar" hidden>
+    <span class="rb-label" id="revLbl">Revenue</span>
+    <div class="seg" id="revSeg" role="group" aria-labelledby="revLbl">
+      <button type="button" data-rev="all" aria-pressed="true">Semua</button>
+      <button type="button" data-rev="net" aria-pressed="false">Tanpa cicilan &amp; pelunasan</button>
+    </div>
+    <span class="rb-hint" id="revHint" hidden>Aktif setelah rumus tab Feed Harian di Exboard diperbarui.</span>
+  </div>
   <div class="cbar" id="cChips"></div>
   <div class="notice err" id="errBox" hidden></div>
   <div id="view"><div class="skel"></div><div class="skel"></div></div>
@@ -405,7 +421,8 @@ function parseMonth(text){
 }
 
 // Harian: tab "Feed Harian" di Exboard. Kolom: Tanggal (yyyy-mm-dd), Center, Show Up, Paid DP, Paid Full,
-// Acquisition, Revenue, Target Acquisition, Target Revenue (target = target bulanan ÷ jumlah hari bulan itu)
+// Acquisition, Revenue, Target Acquisition, Target Revenue (target = target bulanan ÷ jumlah hari bulan itu),
+// lalu (bila ada) Revenue CB Cicilan & Revenue CB Pelunasan = bagian Revenue dari Cash Bertahap: Cicilan / Pelunasan
 function parseDate(s){
   s = String(s||'').trim(); let m;
   if ((m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s))) return `${m[1]}-${m[2]}-${m[3]}`;
@@ -418,19 +435,21 @@ function parseDay(text){
   if (hi < 0) return {entries:[], refErr: refErrIn(text)};
   const head = rows[hi].map(norm), col = n => head.indexOf(n);
   const ix = {showUp:col('show up'), paidDp:col('paid dp'), paidFull:col('paid full'), acq:col('acquisition'),
-    rev:col('revenue'), tgtA:col('target acquisition'), tgtR:col('target revenue')};
+    rev:col('revenue'), tgtA:col('target acquisition'), tgtR:col('target revenue'),
+    cic:col('revenue cb cicilan'), pel:col('revenue cb pelunasan')};
   const raw = [];
   for (const r of rows.slice(hi+1)){
     const key = parseDate(r[0]), c = (r[1]||'').trim().toUpperCase();
     if (!key || key > TODAY || !CENTERS.includes(c)) continue;
     const v = k => ix[k] >= 0 ? sheetNum(r[ix[k]]) : null;
-    raw.push({center:c, key, showUp:v('showUp'), paidDp:v('paidDp'), paidFull:v('paidFull'), actual:v('acq'), rev:v('rev'), target:v('tgtA'), revTarget:v('tgtR')});
+    raw.push({center:c, key, showUp:v('showUp'), paidDp:v('paidDp'), paidFull:v('paidFull'), actual:v('acq'), rev:v('rev'), target:v('tgtA'), revTarget:v('tgtR'),
+      revCic:v('cic'), revPel:v('pel')});
   }
   // Target revenue harian ± Rp 20 jt; kalau tercatat ribuan (± 20.000), revenue juga ribuan
   const maxT = Math.max(0, ...raw.map(e => e.revTarget || 0));
   const unit = maxT > 0 && maxT < 1e6 ? 1000 : 1;
-  raw.forEach(e => { if (e.rev!=null) e.rev *= unit; if (e.revTarget!=null) e.revTarget *= unit; });
-  return {entries: raw.map(entry)};
+  raw.forEach(e => ['rev','revTarget','revCic','revPel'].forEach(f => { if (e[f]!=null) e[f] *= unit; }));
+  return {entries: raw.map(entry), cb: ix.cic >= 0 && ix.pel >= 0};
 }
 const PARSE = {week: parseWeek, month: parseMonth, day: parseDay};
 
@@ -439,8 +458,8 @@ function rollup(daily, keyOf){
   const m = new Map();
   for (const d of daily){
     const k = keyOf(d.key), id = d.center + '|' + k;
-    const a = m.get(id) || {center:d.center, key:k, showUp:0, paidDp:0, paidFull:0, actual:0, rev:0, target:0, revTarget:0};
-    ['showUp','paidDp','paidFull','actual','rev','target','revTarget'].forEach(f => a[f] += d[f] || 0);
+    const a = m.get(id) || {center:d.center, key:k, showUp:0, paidDp:0, paidFull:0, actual:0, rev:0, target:0, revTarget:0, revCic:0, revPel:0};
+    ['showUp','paidDp','paidFull','actual','rev','target','revTarget','revCic','revPel'].forEach(f => a[f] += d[f] || 0);
     m.set(id, a);
   }
   return [...m.values()].map(entry);
@@ -452,11 +471,13 @@ const statusBy = (k, v) => (v==null || isNaN(v)) ? null : v>=TH[k].green ? 'g' :
 function worst(...s){ s = s.filter(Boolean); return s.length ? s.sort((a,b) => ST[b].rank - ST[a].rank)[0] : null; }
 function derive(e){
   if (!e) return null;
+  // Revenue tanpa cicilan & pelunasan: akad Cash Bertahap tetap dihitung, target revenue tetap sama
+  const revCb = (e.revCic||0) + (e.revPel||0), rev = netRev() && has(e.rev) ? e.rev - revCb : e.rev;
   const pct = e.target>0 ? e.actual/e.target*100 : null;
-  const revPct = (has(e.rev) && e.revTarget>0) ? e.rev/e.revTarget*100 : null;
+  const revPct = (has(rev) && e.revTarget>0) ? rev/e.revTarget*100 : null;
   const dp = has(e.dpfp) ? Number(e.dpfp) : null;
   const sAcq = statusBy('acq', pct), sCvr = statusBy('cvr', e.cvr), sRev = statusBy('rev', revPct), sDp = statusBy('dp', dp);
-  return Object.assign({}, e, {pct, revPct, dp, sAcq, sCvr, sRev, sDp, sAll: worst(sAcq, sRev, sCvr, sDp)});
+  return Object.assign({}, e, {rev, revCb, pct, revPct, dp, sAcq, sCvr, sRev, sDp, sAll: worst(sAcq, sRev, sCvr, sDp)});
 }
 function badge(s, text){
   if (!s) return `<span class="badge n">${esc(text||'—')}</span>`;
@@ -478,7 +499,7 @@ function progressBar(pct, s){
 /* ================= State ================= */
 const raw = {week:null, month:null, day:null};       // {entries, pulledAt} per feed
 let store = {};                                      // per jenis periode: {idx, keys, src}
-let ui = Object.assign({mode:'week'}, lsGet(UI_KEY) || {});
+let ui = Object.assign({mode:'week', rev:'all'}, lsGet(UI_KEY) || {});
 if (!P[ui.mode]) ui.mode = 'week';
 const sel = {day:null, week:null, month:null};
 let center = CENTERS.includes(DA.center.get()) ? DA.center.get() : 'ALL';   // 'ALL' = semua center
@@ -487,6 +508,9 @@ const scope = () => center==='ALL' ? 'area' : center;
 let pulling = false;
 
 const active = e => (e.showUp||0) + (e.actual||0) + (e.rev||0) > 0;
+// Opsi revenue hanya untuk angka dari Feed Harian yang sudah punya kolom cicilan & pelunasan
+const cbReady = () => { const s = cur(); return !!(s && s.src==='day' && raw.day && raw.day.cb); };
+const netRev = () => ui.rev==='net' && cbReady();
 function mk(list, src){
   list = list.filter(active);
   return {idx: new Map(list.map(e => [e.center + '|' + e.key, e])), keys: [...new Set(list.map(e => e.key))].sort().reverse(), src};
@@ -524,11 +548,12 @@ function areaTotals(rows){
   const fc = f.filter(r => has(r.e.cvr)), cvr = fc.length ? fc.reduce((a,r) => a + Number(r.e.cvr), 0)/fc.length : null;
   const fr = f.filter(r => r.e.revPct!=null);
   const rev = fr.length ? fr.reduce((a,r) => a + r.e.rev, 0) : null, revT = fr.length ? fr.reduce((a,r) => a + r.e.revTarget, 0) : null;
+  const revCb = fr.reduce((a,r) => a + r.e.revCb, 0);
   const revPct = revT>0 ? rev/revT*100 : null;
   const fd = f.filter(r => r.e.dp!=null), dp = fd.length ? fd.reduce((a,r) => a + r.e.dp, 0)/fd.length : null;
   const showUp = f.reduce((a,r) => a + (r.e.showUp||0), 0);
   const dist = {g:0,y:0,r:0}; f.forEach(r => r.e.sAll && dist[r.e.sAll]++);
-  return {n:f.length, act, tgt, pct, cvr, rev, revT, revPct, dp, showUp, dist,
+  return {n:f.length, act, tgt, pct, cvr, rev, revT, revPct, revCb, dp, showUp, dist,
     sAcq:statusBy('acq', pct), sCvr:statusBy('cvr', cvr), sRev:statusBy('rev', revPct), sDp:statusBy('dp', dp)};
 }
 
@@ -555,6 +580,14 @@ function renderBar(){
   $('#wLatest').textContent = isDay ? 'Hari ini' : 'Terbaru';
 }
 
+function renderRevBar(){
+  const s = cur(), ok = cbReady(), net = netRev();
+  $('#revBar').hidden = !(s && s.src==='day');
+  document.querySelectorAll('#revSeg button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.rev==='net')===net)));
+  $('#revSeg button[data-rev="net"]').disabled = !ok;
+  $('#revHint').hidden = ok;
+}
+
 function setupHint(){
   return `<div class="empty-state"><h2>Harian belum aktif</h2><p>Angka per tanggal dibaca dari tab <b>Feed Harian</b> di Exboard lewat <a href="${feedUrl('day')}" target="_blank" rel="noopener">Feed Rekap Harian</a>. Pastikan tab itu sudah dibuat, feed-nya sudah diberi izin (klik A1 → Allow access) dan dibagikan "Siapa saja yang memiliki link". Setelah itu mode Harian aktif otomatis dan Mingguan / Bulanan ikut memakai angka yang sama.</p></div>`;
 }
@@ -562,6 +595,7 @@ function setupHint(){
 function render(){
   center = DA.centerChips($('#cChips'), CENTERS, c => { center = c; render(); });
   renderBar();
+  renderRevBar();
   renderFoot();
   const el = $('#view'), m = ui.mode, s = cur();
   if (!s){
@@ -579,7 +613,7 @@ function render(){
       <div class="k-foot">${badge(tot.sAcq, fmtPct(tot.pct,0))}${dP(tot.pct, ptot&&ptot.pct)}${tgtNote}</div></div>
     <div class="kpi"><div class="k-label">Revenue ${scope()}</div>
       <div class="k-val">${tot.rev!=null ? fmtRpS(tot.rev) : '—'}</div>
-      <div class="k-foot">${tot.rev!=null ? `${badge(tot.sRev, fmtPct(tot.revPct,0))}<span>dari ${fmtRpS(tot.revT)}</span>${dP(tot.revPct, ptot&&ptot.revPct)}` : '<span class="muted">Belum ada data</span>'}</div></div>
+      <div class="k-foot">${tot.rev!=null ? `${badge(tot.sRev, fmtPct(tot.revPct,0))}<span>dari ${fmtRpS(tot.revT)}</span>${dP(tot.revPct, ptot&&ptot.revPct)}${cbReady() ? `<span class="k-sub">${netRev() ? `Cicilan &amp; pelunasan ${fmtRpS(tot.revCb)} tidak dihitung` : `Termasuk cicilan &amp; pelunasan ${fmtRpS(tot.revCb)}`}</span>` : ''}` : '<span class="muted">Belum ada data</span>'}</div></div>
     <div class="kpi"><div class="k-label">${center==='ALL' ? 'Rata-rata CVR' : 'CVR'}</div>
       <div class="k-val">${fmtPct(tot.cvr)}</div>
       <div class="k-foot">${badge(tot.sCvr)}${dP(tot.cvr, ptot&&ptot.cvr)}</div></div>
@@ -612,7 +646,8 @@ function render(){
   }).join('');
 
   const srcNote = s.src==='week' ? ' Acquisition mingguan saat ini = Paid DP + Paid Full dari feed mingguan; setelah tab Feed Harian ada, beralih ke Acquisition (FP SD) Exboard.'
-    : s.src==='month' ? ' Bulanan diambil dari tab 02 Acquisition (Acquisition & Revenue versi Exboard); hanya bulan yang sedang dipilih di Reporting Month Exboard.' : '';
+    : s.src==='month' ? ' Bulanan diambil dari tab 02 Acquisition (Acquisition & Revenue versi Exboard); hanya bulan yang sedang dipilih di Reporting Month Exboard.'
+    : netRev() ? ' Revenue tanpa cicilan & pelunasan: transaksi Revenue Record bertipe Cash Bertahap: Cicilan dan Cash Bertahap: Pelunasan tidak dihitung, akad tetap dihitung; target revenue tetap sama.' : '';
   const tn = P[m].trendN;
   el.innerHTML = `${kpis}
     <div class="sec-head"><h2>${center==='ALL' ? 'Per center' : esc(center)} · ${esc(P[m].label(k))}</h2>
@@ -658,7 +693,7 @@ function summaryText(){
   const E = s => s ? ST[s].emoji : '⚪';
   const lines = [`*${P[m].title(k)}${center==='ALL' ? '' : ' · ' + center}*`,
     `Acquisition: ${fmt(tot.act,0)}/${fmt(tot.tgt,1)} (${fmtPct(tot.pct,0)}) ${E(tot.sAcq)}`];
-  if (tot.rev!=null) lines.push(`Revenue: ${fmtRpS(tot.rev)}/${fmtRpS(tot.revT).replace('Rp ','')} (${fmtPct(tot.revPct,0)}) ${E(tot.sRev)}`);
+  if (tot.rev!=null) lines.push(`Revenue${netRev() ? ' tanpa cicilan & pelunasan' : ''}: ${fmtRpS(tot.rev)}/${fmtRpS(tot.revT).replace('Rp ','')} (${fmtPct(tot.revPct,0)}) ${E(tot.sRev)}`);
   lines.push(`Rata-rata CVR: ${fmtPct(tot.cvr)} ${E(tot.sCvr)}`);
   if (tot.dp!=null) lines.push(`Rata-rata DP → FP: ${fmtPct(tot.dp)} ${E(tot.sDp)}`);
   lines.push('');
@@ -698,7 +733,7 @@ function errLine(m, err){
 function load(m, text, pulledAt){
   const p = PARSE[m](text);
   if (!p.entries.length) return p;
-  raw[m] = {entries: p.entries, pulledAt};
+  raw[m] = {entries: p.entries, pulledAt, cb: !!p.cb};
   return p;
 }
 async function pullOne(m){
@@ -731,6 +766,10 @@ async function pull(){
 function setKey(k){ if (!k || k===sel[ui.mode]) return; sel[ui.mode] = k; render(); window.scrollTo({top:0}); }
 function setMode(m){ if (!P[m] || m===ui.mode) return; ui.mode = m; lsSet(UI_KEY, ui); render(); }
 $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode); });
+$('#revSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-rev]'); if (!b || b.disabled || b.dataset.rev===ui.rev) return;
+  ui.rev = b.dataset.rev; lsSet(UI_KEY, ui); render();
+});
 $('#wSel').addEventListener('change', e => setKey(e.target.value));
 $('#dSel').addEventListener('change', e => { const v = e.target.value; if (v && v <= TODAY) setKey(v); });
 function step(dir){
