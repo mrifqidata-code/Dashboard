@@ -430,9 +430,10 @@ function agg(list){
 /* ================= Coach tersedia (klik slot) =================
    Coach "masuk" di suatu hari bila punya minimal satu kelas hari itu; tanpa kelas = libur.
    Tersedia = coach yang mengajar di center slot, masuk hari itu, dan tidak punya kelas yang bentrok.
-   Kelas dianggap DUR menit: lane di Exboard memakai dua jadwal yang bergeser 15 menit, dan coach biasa
-   pindah lane dengan jeda 30 menit, jadi bentrok = jam mulai berselisih kurang dari DUR. Slot Tutup bukan kelas. */
-const DUR = 30;
+   Kelas reguler DUR menit, jadi bentrok = jam mulai berselisih kurang dari DUR (lane memakai dua jadwal yang
+   bergeser 15 menit, jadi kelas di lane lain yang mulai 15 atau 30 menit lebih awal/lambat ikut bentrok).
+   Coach center lain tidak ditampilkan. Slot Tutup bukan kelas. */
+const DUR = 45;
 const toMin = t => Number(t.slice(0,2))*60 + Number(t.slice(3,5));
 const fromMin = m => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
 const slotKey = s => [s.center, s.lane, s.day, s.time].join('|');
@@ -448,14 +449,14 @@ function coachAvail(slot){
   const names = new Map();
   all.forEach(s => { if (s.center===slot.center && !names.has(coachKey(s))) names.set(coachKey(s), s.coach); });
   const self = slot.coach ? coachKey(slot) : '';
-  const free = [], busy = [], away = [], off = [];
+  const free = [], busy = [], off = [];
   for (const [k, name] of names){
     if (k===self) continue;
     const day = all.filter(s => coachKey(s)===k && s.day===slot.day).sort((a,b) => toMin(a.time) - toMin(b.time) || a.lane - b.lane);
     if (!day.length){ off.push(name); continue; }
     const c = {name, day, clash: day.filter(s => Math.abs(toMin(s.time) - T) < DUR)};
     if (c.clash.length){ busy.push(c); continue; }
-    if (!day.some(s => s.center===slot.center)){ away.push(c); continue; }
+    if (!day.some(s => s.center===slot.center)) continue;   // seharian di center lain: tidak tersedia di sini
     c.ageOk = !!slot.age && all.some(s => coachKey(s)===k && s.age===slot.age);
     c.prev = day.filter(s => toMin(s.time) < T).pop();
     c.next = day.find(s => toMin(s.time) > T);
@@ -464,10 +465,10 @@ function coachAvail(slot){
   }
   // Yang biasa pegang age group ini dulu, lalu yang slotnya di sela jadwal hari itu, lalu jeda terpendek
   free.sort((a,b) => b.ageOk - a.ageOk || !(a.prev && a.next) - !(b.prev && b.next) || a.idle - b.idle || a.name.localeCompare(b.name));
-  [busy, away].forEach(l => l.sort((a,b) => a.name.localeCompare(b.name)));
+  busy.sort((a,b) => a.name.localeCompare(b.name));
   off.sort((a,b) => a.localeCompare(b));
   const selfClash = self && teaches(slot) ? all.filter(s => coachKey(s)===self && s.day===slot.day && s!==slot && Math.abs(toMin(s.time) - T) < DUR) : [];
-  return {n: names.size, free, busy, away, off, selfClash};
+  return {n: names.size, free, busy, off, selfClash};
 }
 function coachPanelHTML(s){
   const r = coachAvail(s), b = band(s), T = toMin(s.time);
@@ -498,7 +499,6 @@ function coachPanelHTML(s){
     : r.free.length ? `<ul>${r.free.map(cand).join('')}</ul>` : `<p>Tidak ada coach ${esc(s.center)} yang kosong di jam ini.</p>`;
   const parts = [sec('free', 'Coach tersedia', r.free.length, freeBody)];
   if (r.busy.length) parts.push(sec('busy', 'Sedang mengajar di jam ini', r.busy.length, `<ul>${r.busy.map(c => `<li><b>${esc(c.name)}</b>${c.clash.map(chip).join('')}</li>`).join('')}</ul>`));
-  if (r.away.length) parts.push(sec('busy', `Masuk di center lain`, r.away.length, `<ul>${r.away.map(c => `<li><b>${esc(c.name)}</b><span class="muted">${esc(Array.from(new Set(c.day.map(x => x.center))).join(', '))} · ${c.day.length} kelas</span></li>`).join('')}</ul>`));
   if (r.off.length) parts.push(sec('off', `Libur hari ${esc(s.day)}`, r.off.length, `<p>${r.off.map(esc).join(', ')}</p>`));
 
   return `<div class="sh-head">
@@ -512,7 +512,7 @@ function coachPanelHTML(s){
     <div class="sh-body">
       ${warn.join('')}
       ${parts.join('')}
-      <p class="sh-rule">Tersedia = coach yang punya kelas di ${esc(s.center)}, masuk hari ${esc(s.day)} (minimal satu kelas hari itu; tanpa kelas = libur), dan tidak sedang mengajar. Kelas dianggap ${DUR} menit, jadi bentrok bila jam mulai berselisih kurang dari ${DUR} menit. Slot Tutup tidak dihitung sebagai kelas.</p>
+      <p class="sh-rule">Tersedia = coach yang punya kelas di ${esc(s.center)}, masuk hari ${esc(s.day)} (minimal satu kelas hari itu; tanpa kelas = libur), dan tidak sedang mengajar. Kelas reguler ${DUR} menit, jadi bentrok bila jam mulai berselisih kurang dari ${DUR} menit. Slot Tutup tidak dihitung sebagai kelas.</p>
     </div>`;
 }
 

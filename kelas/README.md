@@ -34,9 +34,9 @@ Klik/tap sel slot mana pun untuk membuka daftar coach yang bisa mengajar di jam 
   ada di sela jadwal hari itu, lalu jeda terpendek. Tiap coach menampilkan jadwalnya hari itu dengan
   posisi slot yang diklik (kotak putus-putus).
 - **Sedang mengajar di jam ini**: bentrok dengan kelas lain.
-- **Masuk di center lain**: masuk hari itu, tetapi semua kelasnya di center lain.
 - **Libur**: tidak punya kelas sama sekali hari itu.
 
-Kelas dianggap 30 menit (`DUR`): lane memakai dua jadwal yang bergeser 15 menit dan coach biasa pindah lane
-dengan jeda 30 menit, jadi kelas yang jam mulainya berselisih kurang dari 30 menit dihitung bentrok.
+Kelas reguler 45 menit (`DUR`), jadi kelas yang jam mulainya berselisih kurang dari 45 menit dihitung bentrok.
+Lane memakai dua jadwal yang bergeser 15 menit, jadi kelas di lane lain yang mulai 15 atau 30 menit lebih awal
+atau lebih lambat juga bentrok. Coach center lain tidak ditampilkan.
 Slot Tutup (kapasitas 0, tanpa murid) dan tulisan CLOSE di kolom coach bukan kelas.

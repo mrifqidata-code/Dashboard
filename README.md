@@ -79,8 +79,9 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   (seharusnya Inactive). Apps Script mengirim semua kolom CB Tracker beserta judulnya; halaman memilih kolom lewat judul.
 - Slot Map: klik slot untuk melihat coach yang tersedia. Coach dianggap masuk di suatu hari bila punya minimal satu
   kelas hari itu (tanpa kelas = libur). Tersedia = coach yang punya kelas di center slot, masuk hari itu, dan tidak
-  punya kelas lain yang jam mulainya berselisih kurang dari 30 menit (`DUR` di `kelas/index.html`). Slot Tutup
-  (kapasitas 0, tanpa murid) dan tulisan CLOSE di kolom coach tidak dihitung sebagai kelas.
+  punya kelas lain yang jam mulainya berselisih kurang dari 45 menit (kelas reguler, `DUR` di `kelas/index.html`).
+  Coach center lain tidak ditampilkan. Slot Tutup (kapasitas 0, tanpa murid) dan tulisan CLOSE di kolom coach
+  tidak dihitung sebagai kelas.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.
