@@ -14,7 +14,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
 | | Retention per SA Retention (SAR) | `sa/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | PIP (band & status PIP / Watch / OK per advisor) | `sa/pip/` | Feed Dashboard Tambahan (tab 05) |
-| **Kelas** | Slot Map | `kelas/` | Feed Slot Map (Reguler Class Availability) |
+| **Kelas** | Slot Map (klik slot → coach yang tersedia di jam itu) | `kelas/` | Feed Slot Map (Reguler Class Availability) |
 | | Utilisasi per age group & hari, headroom, kelas trial | `kelas/utilisasi/` | Feed Dashboard Tambahan (tab 08) |
 | | Coach (beban murid, sesi per hari, level murid) | `kelas/coach/` | Feed Dashboard Tambahan (tab 11, dan tabel G tab 08) |
 
@@ -77,6 +77,10 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
   Filter nominal "Sisa tagihan di atas 1 juta" (`MIN_SISA`) menyembunyikan sisa kecil yang biasanya diskon ber-approval.
   Filter "Default tapi masih Active": murid default yang di kolom Status Student Management CB Tracker masih Active
   (seharusnya Inactive). Apps Script mengirim semua kolom CB Tracker beserta judulnya; halaman memilih kolom lewat judul.
+- Slot Map: klik slot untuk melihat coach yang tersedia. Coach dianggap masuk di suatu hari bila punya minimal satu
+  kelas hari itu (tanpa kelas = libur). Tersedia = coach yang punya kelas di center slot, masuk hari itu, dan tidak
+  punya kelas lain yang jam mulainya berselisih kurang dari 30 menit (`DUR` di `kelas/index.html`). Slot Tutup
+  (kapasitas 0, tanpa murid) dan tulisan CLOSE di kolom coach tidak dihitung sebagai kelas.
 - Coach: beban dinilai terhadap rata-rata coach di center yang sama (merah bila >30% di atasnya);
   sesi per hari merah ≥7, oranye 6. Potensi revenue di tab 08 tercatat dalam ribuan rupiah (dikali ×1.000).
 - Data ditarik ulang otomatis saat aplikasi dibuka lagi setelah 5 menit.

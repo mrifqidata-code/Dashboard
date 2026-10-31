@@ -211,6 +211,46 @@ table.sum{width:100%;border-collapse:collapse;font-size:13.5px}
 @keyframes sh{to{background-position:-200% 0}}
 @media (prefers-reduced-motion: reduce){.skel{animation:none}}
 .top{padding-top:env(safe-area-inset-top,0px)}
+
+/* Klik slot → coach tersedia */
+td.c{position:relative}
+.c-hit{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:0;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.c-hit:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.c-hit:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+html.dlg-open{overflow:hidden}
+dialog.sheet{border:0;padding:0;margin:auto;width:min(560px,calc(100% - 32px));max-width:none;max-height:min(86vh,760px);border-radius:16px;background:var(--surface);color:var(--ink);box-shadow:0 24px 60px rgba(0,0,0,.28);overflow:hidden}
+dialog.sheet[open]{display:flex;flex-direction:column}
+dialog.sheet::backdrop{background:rgba(6,14,16,.5)}
+.sh-head{flex:none;display:flex;align-items:flex-start;gap:12px;padding:16px 16px 12px;border-bottom:1px solid var(--border)}
+.sh-head .eb{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sh-head h2{font-size:20px;font-weight:750;margin-top:2px}
+.sh-head .meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:6px;font-size:13px;color:var(--ink-2)}
+.sh-head .meta b{color:var(--ink)}
+.sh-x{margin-left:auto;flex:none;width:36px;height:36px;border-radius:9px;border:1px solid var(--border-2);background:var(--surface);display:grid;place-items:center;cursor:pointer}
+.sh-x svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.sh-x:hover{background:var(--surface-2)}
+.sh-x:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sh-body{overflow-y:auto;overscroll-behavior:contain;min-height:0;padding:14px 16px 18px;display:grid;gap:18px}
+.sh-sec h3{font-size:12.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);display:flex;align-items:center;gap:8px}
+.sh-sec h3 .n{font-size:12px;font-weight:700;letter-spacing:0;border-radius:999px;padding:0 8px;background:var(--surface-2);border:1px solid var(--border);color:var(--ink)}
+.sh-sec.free h3 .n{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.sh-sec ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.sh-sec p{margin:6px 0 0;font-size:13.5px;color:var(--ink-2)}
+.cand{border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.cand-top{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap}
+.cand-top b{font-size:14.5px}
+.cand-top .fit{font-size:12px;font-weight:600;color:var(--good-ink)}
+.cand-top .nofit{font-size:12px;color:var(--muted)}
+.dchips{display:flex;flex-wrap:wrap;gap:4px}
+.dchips .age,.sh-sec.busy .age{font-variant-numeric:tabular-nums}
+.age.here{background:transparent;color:var(--accent);border:1.5px dashed var(--accent)}
+.cand-note{font-size:12.5px;color:var(--ink-2)}
+.sh-sec.busy li{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;font-size:13.5px}
+.sh-rule{margin:0;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+@media (max-width:640px){
+  dialog.sheet{width:100%;margin:auto 0 0;border-radius:18px 18px 0 0;max-height:88vh}
+  .sh-body{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
@@ -245,6 +285,7 @@ table.sum{width:100%;border-collapse:collapse;font-size:13.5px}
   <div id="view"></div>
   <div class="foot" id="foot"></div>
 </main>
+<dialog class="sheet" id="coachDlg" aria-labelledby="shTitle"></dialog>
 
 <script src="../assets/shell.js"></script>
 <script>
@@ -318,7 +359,7 @@ function normAge(s){
 function normCoach(s){
   if (s===undefined) return undefined;
   s = (s||'').replace(/\s+/g,' ').trim();
-  if (!s || s==='-' || /^(available|not available)$/i.test(s)) return '';
+  if (!s || s==='-' || /^(available|not available|closed?|tutup)$/i.test(s)) return '';   // CLOSE = penanda slot tutup, bukan nama
   return titleCase(s);
 }
 
@@ -386,6 +427,95 @@ function agg(list){
   return {cap, used, util: cap>0 ? used/cap : null, n: m.length};
 }
 
+/* ================= Coach tersedia (klik slot) =================
+   Coach "masuk" di suatu hari bila punya minimal satu kelas hari itu; tanpa kelas = libur.
+   Tersedia = coach yang mengajar di center slot, masuk hari itu, dan tidak punya kelas yang bentrok.
+   Kelas dianggap DUR menit: lane di Exboard memakai dua jadwal yang bergeser 15 menit, dan coach biasa
+   pindah lane dengan jeda 30 menit, jadi bentrok = jam mulai berselisih kurang dari DUR. Slot Tutup bukan kelas. */
+const DUR = 30;
+const toMin = t => Number(t.slice(0,2))*60 + Number(t.slice(3,5));
+const fromMin = m => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+const slotKey = s => [s.center, s.lane, s.day, s.time].join('|');
+const coachKey = s => s.coach.toLowerCase();
+const teaches = s => !!s.coach && band(s) !== 'closed';
+let slotIdx = null;
+function slotByKey(k){
+  if (!slotIdx || slotIdx.src !== data) slotIdx = {src: data, m: new Map(data.slots.map(s => [slotKey(s), s]))};   // sama dengan laneHTML: slot terakhir menang
+  return slotIdx.m.get(k);
+}
+function coachAvail(slot){
+  const T = toMin(slot.time), all = data.slots.filter(teaches);
+  const names = new Map();
+  all.forEach(s => { if (s.center===slot.center && !names.has(coachKey(s))) names.set(coachKey(s), s.coach); });
+  const self = slot.coach ? coachKey(slot) : '';
+  const free = [], busy = [], away = [], off = [];
+  for (const [k, name] of names){
+    if (k===self) continue;
+    const day = all.filter(s => coachKey(s)===k && s.day===slot.day).sort((a,b) => toMin(a.time) - toMin(b.time) || a.lane - b.lane);
+    if (!day.length){ off.push(name); continue; }
+    const c = {name, day, clash: day.filter(s => Math.abs(toMin(s.time) - T) < DUR)};
+    if (c.clash.length){ busy.push(c); continue; }
+    if (!day.some(s => s.center===slot.center)){ away.push(c); continue; }
+    c.ageOk = !!slot.age && all.some(s => coachKey(s)===k && s.age===slot.age);
+    c.prev = day.filter(s => toMin(s.time) < T).pop();
+    c.next = day.find(s => toMin(s.time) > T);
+    c.idle = Math.min(c.prev ? T - toMin(c.prev.time) - DUR : 1e9, c.next ? toMin(c.next.time) - T - DUR : 1e9);
+    free.push(c);
+  }
+  // Yang biasa pegang age group ini dulu, lalu yang slotnya di sela jadwal hari itu, lalu jeda terpendek
+  free.sort((a,b) => b.ageOk - a.ageOk || !(a.prev && a.next) - !(b.prev && b.next) || a.idle - b.idle || a.name.localeCompare(b.name));
+  [busy, away].forEach(l => l.sort((a,b) => a.name.localeCompare(b.name)));
+  off.sort((a,b) => a.localeCompare(b));
+  const selfClash = self && teaches(slot) ? all.filter(s => coachKey(s)===self && s.day===slot.day && s!==slot && Math.abs(toMin(s.time) - T) < DUR) : [];
+  return {n: names.size, free, busy, away, off, selfClash};
+}
+function coachPanelHTML(s){
+  const r = coachAvail(s), b = band(s), T = toMin(s.time);
+  const where = x => (x.center!==s.center ? esc(x.center) + ' ' : '') + `${esc(x.time)} · L${x.lane}`;
+  const chip = x => `<span class="age ${x.age ? esc(x.age.toLowerCase()) : 'none'}" title="${esc(x.age || 'Tanpa age group')}">${where(x)}</span>`;
+  const sec = (cls, title, n, body) => `<section class="sh-sec ${cls}"><h3>${title}<span class="n">${n}</span></h3>${body}</section>`;
+
+  const fill = measurable(s) ? `<span><b>${s.used}</b>/${s.cap} murid</span>`
+    : b==='closed' ? `<span class="tag closed">Tutup</span>` : b==='void' || !(s.age || s.coach || s.used>0) ? `<span>Slot kosong</span>` : '';
+  const cur = s.coach===undefined ? `<span class="muted">Coach tak tercatat di sumber</span>`
+    : s.coach ? `<span>Coach <b>${esc(s.coach)}</b></span>` : `<span>Belum ada coach</span>`;
+  const warn = [];
+  if (r.selfClash.length) warn.push(`<div class="notice"><span><b>${esc(s.coach)}</b> juga tercatat mengajar di jam yang bentrok: ${r.selfClash.map(where).join(', ')}.</span></div>`);
+  const noCoach = Object.keys(data.lost).filter(l => data.lost[l].has('coach')).map(Number).sort((x,y)=>x-y);
+  if (noCoach.length) warn.push(`<div class="notice"><span>Lane ${noCoach.join(', ')} tidak punya kolom coach di sumber, jadi kelas di lane itu belum ikut dihitung.</span></div>`);
+
+  const cand = c => {
+    const items = c.day.map(x => ({t: toMin(x.time), h: chip(x)}));
+    items.push({t: T, h: `<span class="age here" title="Slot ini">${esc(s.time)} · L${s.lane}</span>`, here: 1});
+    items.sort((x,y) => x.t - y.t || (x.here||0) - (y.here||0));
+    const note = c.prev && c.next ? `Di sela jadwalnya · kosong ${fromMin(toMin(c.prev.time) + DUR)}–${esc(c.next.time)}`
+      : c.prev ? `Setelah kelas terakhirnya (selesai ${fromMin(toMin(c.prev.time) + DUR)})`
+      : `Sebelum kelas pertamanya (${esc(c.next.time)})`;
+    const fit = !s.age ? '' : c.ageOk ? `<span class="fit">Mengajar ${esc(s.age)}</span>` : `<span class="nofit">Belum ada kelas ${esc(s.age)}</span>`;
+    return `<li class="cand"><div class="cand-top"><b>${esc(c.name)}</b>${fit}</div><div class="dchips">${items.map(x => x.h).join('')}</div><div class="cand-note">${note} · ${c.day.length} kelas hari ini</div></li>`;
+  };
+  const freeBody = !r.n ? `<p>Belum ada coach tercatat di ${esc(s.center)}.</p>`
+    : r.free.length ? `<ul>${r.free.map(cand).join('')}</ul>` : `<p>Tidak ada coach ${esc(s.center)} yang kosong di jam ini.</p>`;
+  const parts = [sec('free', 'Coach tersedia', r.free.length, freeBody)];
+  if (r.busy.length) parts.push(sec('busy', 'Sedang mengajar di jam ini', r.busy.length, `<ul>${r.busy.map(c => `<li><b>${esc(c.name)}</b>${c.clash.map(chip).join('')}</li>`).join('')}</ul>`));
+  if (r.away.length) parts.push(sec('busy', `Masuk di center lain`, r.away.length, `<ul>${r.away.map(c => `<li><b>${esc(c.name)}</b><span class="muted">${esc(Array.from(new Set(c.day.map(x => x.center))).join(', '))} · ${c.day.length} kelas</span></li>`).join('')}</ul>`));
+  if (r.off.length) parts.push(sec('off', `Libur hari ${esc(s.day)}`, r.off.length, `<p>${r.off.map(esc).join(', ')}</p>`));
+
+  return `<div class="sh-head">
+      <div>
+        <div class="eb">${esc(s.center)} · Lane ${s.lane}</div>
+        <h2 id="shTitle">${esc(s.day)} ${esc(s.time)}</h2>
+        <div class="meta">${s.age ? `<span class="age ${esc(s.age.toLowerCase())}">${esc(s.age)}</span>` : `<span class="age none">Tanpa age group</span>`}${fill}${cur}</div>
+      </div>
+      <button type="button" class="sh-x" data-close aria-label="Tutup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="sh-body">
+      ${warn.join('')}
+      ${parts.join('')}
+      <p class="sh-rule">Tersedia = coach yang punya kelas di ${esc(s.center)}, masuk hari ${esc(s.day)} (minimal satu kelas hari itu; tanpa kelas = libur), dan tidak sedang mengajar. Kelas dianggap ${DUR} menit, jadi bentrok bila jam mulai berselisih kurang dari ${DUR} menit. Slot Tutup tidak dihitung sebagai kelas.</p>
+    </div>`;
+}
+
 /* ================= State ================= */
 let data = null;            // {slots, lost, pulledAt, source}
 let ui = Object.assign({center:'KLM'}, lsGet(UI_KEY) || {});
@@ -413,6 +543,7 @@ function cellHTML(s){
   if (!s) return `<td class="c b-void"></td>`;
   const b = band(s);
   const cls = 'c b-' + b;
+  const hit = `<button type="button" class="c-hit" data-k="${esc(slotKey(s))}" aria-label="${esc(`Coach tersedia ${s.day} ${s.time}, Lane ${s.lane}`)}"></button>`;
   const u = measurable(s) ? s.used / s.cap : null;
   const title = `${s.day} ${s.time} · Lane ${s.lane}` + (s.age ? ` · ${s.age}` : '') + (s.coach ? ` · ${s.coach}` : '') + (u!=null ? ` · ${s.used}/${s.cap} (${pct(u)})` : '');
   const ageChip = s.age ? `<span class="age ${esc(s.age.toLowerCase())}">${esc(s.age)}</span>` : `<span class="age none">Tanpa age group</span>`;
@@ -424,11 +555,11 @@ function cellHTML(s){
   else if (s.avail) right = `<span class="tag av" title="Status availability dari sumber">${s.avail==='AVAILABLE' ? 'Avail' : 'Not avail'}</span>`;
 
   if (b==='void'){
-    return `<td class="c b-void"><div class="c-empty">—</div></td>`;
+    return `<td class="c b-void"><div class="c-empty">—</div>${hit}</td>`;
   }
   if (!s.age && !s.coach && !(s.used>0)){
     const capT = s.cap==null ? '' : ` · 0/${s.cap}`;
-    return `<td class="c b-void" title="${esc(title)}"><div class="c-empty">Slot kosong${capT}</div></td>`;
+    return `<td class="c b-void" title="${esc(title)}"><div class="c-empty">Slot kosong${capT}</div>${hit}</td>`;
   }
   let fill;
   if (s.cap!=null && s.used!=null){
@@ -443,7 +574,7 @@ function cellHTML(s){
   if (s.coach===undefined) coach = `<div class="c-coach na" title="Kolom coach lane ini tidak ada di sumber">coach tak tercatat</div>`;
   else if (!s.coach) coach = `<div class="c-coach na">—</div>`;
   else coach = `<div class="c-coach" title="${esc(s.coach)}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>${esc(s.coach)}</div>`;
-  return `<td class="${cls}" title="${esc(title)}"><div class="c-top">${ageChip}${right}</div>${fill}${coach}</td>`;
+  return `<td class="${cls}" title="${esc(title)}"><div class="c-top">${ageChip}${right}</div>${fill}${coach}${hit}</td>`;
 }
 
 function laneHTML(lane, list){
@@ -547,10 +678,12 @@ function render(){
         <span class="sw" style="background:var(--u3)"></span>Penuh
         <span class="sw" style="background:var(--crit-bg)"></span>Lebih / slot kapasitas 0
         <span class="sw" style="background:repeating-linear-gradient(135deg,var(--hatch) 0 4px,transparent 4px 8px),var(--surface)"></span>Tutup</span>
+      <span class="grp muted">Klik slot untuk melihat coach yang tersedia di jam itu</span>
     </div>
     <div style="display:grid;gap:16px;margin-top:16px">${lanes.map(l => laneHTML(l, list.filter(s => s.lane===l))).join('')}</div>
     <div style="margin-top:16px">${summaryHTML(list)}</div>`;
   renderFoot();
+  if (dlg.open) drawCoach();   // data baru saat popup terbuka
 }
 
 function renderFoot(){
@@ -664,6 +797,23 @@ $('#tabs').addEventListener('keydown', e => {
   ui.center = n.dataset.c; saveCenter(); render(); document.querySelector(`#tabs button[data-c="${n.dataset.c}"]`).focus();
 });
 $('#pullBtn').addEventListener('click', pull);
+const dlg = $('#coachDlg');
+let dlgKey = null;
+function drawCoach(){
+  const s = data && slotByKey(dlgKey);
+  if (!s){ if (dlg.open) dlg.close(); return false; }
+  const refocus = dlg.open && dlg.contains(document.activeElement);
+  dlg.innerHTML = coachPanelHTML(s);
+  if (refocus) dlg.querySelector('.sh-x').focus();
+  return true;
+}
+$('#view').addEventListener('click', e => {
+  const b = e.target.closest('.c-hit'); if (!b) return;
+  dlgKey = b.dataset.k;
+  if (drawCoach() && !dlg.open){ dlg.showModal(); document.documentElement.classList.add('dlg-open'); }
+});
+dlg.addEventListener('click', e => { if (e.target===dlg || e.target.closest('[data-close]')) dlg.close(); });   // klik latar = tutup
+dlg.addEventListener('close', () => { document.documentElement.classList.remove('dlg-open'); dlgKey = null; });
 $('#csvFile').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   const text = await f.text();
