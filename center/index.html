@@ -184,6 +184,20 @@ table.trend{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5p
 .trend td.g::before{background:var(--good)} .trend td.y::before{background:var(--warn)} .trend td.r::before{background:var(--crit)}
 .trend td.cur{box-shadow:inset 2px 0 0 var(--accent),inset -2px 0 0 var(--accent)}
 
+/* Tab Rekap / Weekly */
+.viewtabs{padding-top:12px}
+.viewtabs .tabnav{margin:0}
+.weekbar[hidden]{display:none}
+.sec-head.first{margin-top:4px}
+/* Weekly: satu baris = satu minggu */
+table.weekly{min-width:720px}
+.weekly td.lbl{min-width:118px}
+.weekly td.lbl button{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--accent);cursor:pointer}
+.weekly td.lbl button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.weekly td.lbl .badge{margin-left:6px;font-size:11px;padding:0 7px;vertical-align:1px}
+.weekly .wr{display:block;font-size:12px;font-weight:500;color:var(--muted)}
+.weekly td small{color:var(--muted);font-weight:500}
+
 .empty-state{text-align:center;padding:40px 16px;border:1px dashed var(--border-2);border-radius:14px;background:var(--surface)}
 .empty-state h2{font-size:17px;margin-bottom:6px}
 .empty-state p{color:var(--ink-2);margin:0 auto;max-width:460px;font-size:14px}
@@ -212,7 +226,12 @@ table.trend{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5p
   </div>
 </header>
 
-<div class="weekbar">
+<div class="wrap viewtabs"><nav class="tabnav" id="viewTabs" aria-label="Tampilan Rekap Acquisition">
+  <a href="#rekap" data-view="rekap">Rekap</a>
+  <a href="#weekly" data-view="weekly">Weekly</a>
+</nav></div>
+
+<div class="weekbar" id="weekbar">
   <div class="wrap wb">
     <div class="seg" id="modeSeg" role="group" aria-label="Jenis periode">
       <button type="button" data-mode="day" aria-pressed="false">Harian</button>
@@ -499,7 +518,8 @@ function progressBar(pct, s){
 /* ================= State ================= */
 const raw = {week:null, month:null, day:null};       // {entries, pulledAt} per feed
 let store = {};                                      // per jenis periode: {idx, keys, src}
-let ui = Object.assign({mode:'week', rev:'all'}, lsGet(UI_KEY) || {});
+let ui = Object.assign({mode:'week', rev:'all', view:'rekap'}, lsGet(UI_KEY) || {});
+if (/^#(rekap|weekly)$/.test(location.hash)) ui.view = location.hash.slice(1);   // tautan langsung ke salah satu tab
 if (!P[ui.mode]) ui.mode = 'week';
 const sel = {day:null, week:null, month:null};
 let center = CENTERS.includes(DA.center.get()) ? DA.center.get() : 'ALL';   // 'ALL' = semua center
@@ -532,7 +552,7 @@ function build(){
   Object.keys(P).forEach(m => { const s = store[m]; if (s && (!sel[m] || !s.keys.includes(sel[m]) && m!=='day')) sel[m] = defaultKey(m); });
 }
 function defaultKey(m){ const s = store[m]; if (!s) return P[m].cur; return s.keys.find(k => k <= P[m].cur) || s.keys[0] || P[m].cur; }
-const cur = () => store[ui.mode];
+const cur = () => store[ui.view==='weekly' ? 'week' : ui.mode];
 const key = () => sel[ui.mode] || defaultKey(ui.mode);
 const get = (c, k) => { const s = cur(); return s ? s.idx.get(c + '|' + k) || null : null; };
 function periodRows(k){
@@ -592,12 +612,46 @@ function setupHint(){
   return `<div class="empty-state"><h2>Harian belum aktif</h2><p>Angka per tanggal dibaca dari tab <b>Feed Harian</b> di Exboard lewat <a href="${feedUrl('day')}" target="_blank" rel="noopener">Feed Rekap Harian</a>. Pastikan tab itu sudah dibuat, feed-nya sudah diberi izin (klik A1 → Allow access) dan dibagikan "Siapa saja yang memiliki link". Setelah itu mode Harian aktif otomatis dan Mingguan / Bulanan ikut memakai angka yang sama.</p></div>`;
 }
 
+function renderTabs(){
+  document.querySelectorAll('#viewTabs a').forEach(a => {
+    if (a.dataset.view===ui.view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+  $('#weekbar').hidden = ui.view==='weekly';
+}
+
+// Weekly: satu baris = satu minggu (terbaru di atas), angkanya sama dengan Rekap mode Mingguan
+function weeklyHTML(s){
+  if (!s) return pulling ? '' : `<div class="empty-state"><h2>Belum ada data mingguan</h2><p>Data belum pernah berhasil ditarik di perangkat ini. Periksa pesan di atas, lalu ketuk tombol tarik ulang.</p></div>`;
+  const pc = (st, v) => `<td class="${st||''}">${fmtPct(v,0)}</td>`;
+  const thisYear = new RegExp(' ' + TODAY.slice(0,4) + '$');            // tahun berjalan tidak perlu ditulis
+  const rows = s.keys.map(k => {
+    const t = areaTotals(CENTERS.filter(shown).map(c => ({center:c, e: derive(s.idx.get(c + '|' + k) || null)})));
+    const lbl = `<td class="lbl"><button type="button" data-wk="${k}" title="Buka rincian per center">${weekNo(k)}</button>${k===CUR_WEEK ? '<span class="badge n">berjalan</span>' : ''}<span class="wr">${esc(weekRange(k).replace(thisYear, ''))}</span></td>`;
+    if (!t) return `<tr>${lbl}<td colspan="7" class="muted" style="text-align:left">Tidak ada aktivitas</td></tr>`;
+    return `<tr>${lbl}<td>${fmt(t.act,0)} <small>/ ${fmt(t.tgt,1)}</small></td>${pc(t.sAcq, t.pct)}<td>${fmtRpS(t.rev)}</td>${pc(t.sRev, t.revPct)}<td>${fmt(t.showUp,0)}</td>${pc(t.sCvr, t.cvr)}${pc(t.sDp, t.dp)}</tr>`;
+  }).join('');
+  const notes = [
+    'Satu baris = satu minggu (Senin–Minggu), terbaru di atas; angkanya sama dengan Rekap mode Mingguan. Minggu berjalan memakai target s.d. hari ini. Ketuk minggu untuk melihat rinciannya per center.',
+    center==='ALL' ? 'Semua center: CVR dan DP → FP = rata-rata antar center.' : '',
+    netRev() ? 'Revenue tanpa cicilan & pelunasan Cash Bertahap (akad tetap dihitung).' : '',
+    s.src==='week' ? 'Acquisition dari feed mingguan (Paid DP + Paid Full) karena tab Feed Harian belum terbaca.' : ''
+  ].filter(Boolean).join(' ');
+  return `<div class="sec-head first"><h2>Weekly · ${center==='ALL' ? 'semua center' : esc(center)}</h2><span class="note" style="margin:0">${s.keys.length} minggu</span></div>
+    <div class="table-wrap"><table class="trend weekly">
+      <thead><tr><th class="lbl">Minggu</th><th>Acquisition</th><th>%</th><th>Revenue</th><th>%</th><th>Show up</th><th>CVR</th><th>DP → FP</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <p class="note">${esc(notes)}</p>
+    <p class="note">% Acquisition &amp; Revenue: hijau ≥${TH.acq.green}% target, kuning ${TH.acq.red}–${TH.acq.green}%, merah &lt;${TH.acq.red}%. CVR: hijau ≥${TH.cvr.green}%, merah &lt;${TH.cvr.red}%. DP → FP: hijau ≥${TH.dp.green}%, merah &lt;${TH.dp.red}%.</p>`;
+}
+
 function render(){
   center = DA.centerChips($('#cChips'), CENTERS, c => { center = c; render(); });
-  renderBar();
+  renderTabs();
+  if (ui.view!=='weekly') renderBar();
   renderRevBar();
   renderFoot();
   const el = $('#view'), m = ui.mode, s = cur();
+  if (ui.view==='weekly'){ el.innerHTML = weeklyHTML(s); return; }
   if (!s){
     if (m==='day'){ el.innerHTML = setupHint(); return; }
     if (!pulling) el.innerHTML = `<div class="empty-state"><h2>Belum ada data</h2><p>Data belum pernah berhasil ditarik di perangkat ini. Periksa pesan di atas, lalu ketuk tombol tarik ulang.</p></div>`;
@@ -765,6 +819,15 @@ async function pull(){
 /* ================= Event ================= */
 function setKey(k){ if (!k || k===sel[ui.mode]) return; sel[ui.mode] = k; render(); window.scrollTo({top:0}); }
 function setMode(m){ if (!P[m] || m===ui.mode) return; ui.mode = m; lsSet(UI_KEY, ui); render(); }
+function setView(v){
+  if (v!=='weekly') v = 'rekap';
+  if (v===ui.view) return;
+  ui.view = v; lsSet(UI_KEY, ui);
+  try { history.replaceState(null, '', '#' + v); } catch(e){}
+  render(); window.scrollTo({top:0});
+}
+$('#viewTabs').addEventListener('click', e => { const a = e.target.closest('a[data-view]'); if (!a) return; e.preventDefault(); setView(a.dataset.view); });
+window.addEventListener('hashchange', () => { if (/^#(rekap|weekly)$/.test(location.hash)) setView(location.hash.slice(1)); });
 $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode); });
 $('#revSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-rev]'); if (!b || b.disabled || b.dataset.rev===ui.rev) return;
@@ -783,6 +846,8 @@ $('#wNext').addEventListener('click', () => step(1));
 $('#wLatest').addEventListener('click', () => setKey(defaultKey(ui.mode)));
 $('#pullBtn').addEventListener('click', pull);
 $('#view').addEventListener('click', async e => {
+  const wb = e.target.closest('button[data-wk]');
+  if (wb){ ui.mode = 'week'; sel.week = wb.dataset.wk; setView('rekap'); return; }   // Weekly → rincian minggu itu
   const kb = e.target.closest('button[data-key]');
   if (kb){ setKey(kb.dataset.key); return; }
   if (e.target.closest('#copyBtn')) toast(await copyText(summaryText()) ? 'Ringkasan disalin. Tempel di WhatsApp.' : 'Gagal menyalin ringkasan.');
