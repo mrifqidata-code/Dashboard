@@ -1,0 +1,166 @@
+/* =========================================================================
+   Sparks Swim — tema brand dashboard
+   Dimuat SETELAH gaya halaman, jadi menimpa token warna & beberapa komponen.
+   Palet diambil dari logo: teal #2FC3C6, biru #1B6FB5, bintang #F7B733.
+   ========================================================================= */
+
+/* ---------- Token brand (selalu tersedia) ---------- */
+:root{
+  --brand-teal:#2FC3C6;
+  --brand-teal-deep:#17A2A6;
+  --brand-blue:#1B6FB5;
+  --brand-blue-deep:#14548A;
+  --brand-gold:#F7B733;
+  --brand-grad:linear-gradient(120deg,#2FC3C6 0%,#1B6FB5 100%);
+  --brand-grad-soft:linear-gradient(120deg,rgba(47,195,198,.16) 0%,rgba(27,111,181,.16) 100%);
+}
+
+/* ---------- Mode terang ---------- */
+:root{
+  color-scheme:light;
+  --page:#F4F7F9;
+  --surface:#FFFFFF;
+  --surface-2:#EEF4F7;
+  --ink:#0A1B24;
+  --ink-2:#4A5F6B;
+  --muted:#7C8F9A;
+  --border:rgba(20,84,138,.13);
+  --border-2:rgba(20,84,138,.24);
+  --axis:#B7C8D2;
+
+  --accent:#1B6FB5;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#DFF4F6;
+
+  --rope:#D7E6EC;
+
+  /* warna seri (center): teal, biru, emas, ungu, koral, hijau */
+  --s1:#2FC3C6; --s2:#1B6FB5; --s3:#E39A18; --s4:#7A6FD0; --s5:#E06B6B; --s6:#2FA36B;
+
+  --shadow:0 1px 2px rgba(12,52,80,.05),0 6px 18px rgba(12,52,80,.07);
+}
+
+/* ---------- Mode gelap ---------- */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --page:#0B1114;
+    --surface:#131C21;
+    --surface-2:#1A252B;
+    --ink:#FFFFFF;
+    --ink-2:#B9C9D3;
+    --muted:#8CA0AB;
+    --border:rgba(255,255,255,.10);
+    --border-2:rgba(255,255,255,.20);
+    --axis:#3A4A52;
+
+    --accent:#35C6C9;
+    --accent-ink:#06232A;
+    --accent-soft:#10333A;
+
+    --rope:#22343A;
+
+    --s1:#35C6C9; --s2:#5AA9E6; --s3:#F0B84A; --s4:#9A90E0; --s5:#E88888; --s6:#4CB985;
+
+    --shadow:0 1px 2px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --page:#0B1114;
+  --surface:#131C21;
+  --surface-2:#1A252B;
+  --ink:#FFFFFF;
+  --ink-2:#B9C9D3;
+  --muted:#8CA0AB;
+  --border:rgba(255,255,255,.10);
+  --border-2:rgba(255,255,255,.20);
+  --axis:#3A4A52;
+
+  --accent:#35C6C9;
+  --accent-ink:#06232A;
+  --accent-soft:#10333A;
+
+  --rope:#22343A;
+
+  --s1:#35C6C9; --s2:#5AA9E6; --s3:#F0B84A; --s4:#9A90E0; --s5:#E88888; --s6:#4CB985;
+
+  --shadow:0 1px 2px rgba(0,0,0,.45);
+}
+
+/* ---------- Latar halaman: semburat teal halus di atas ---------- */
+body{
+  background:
+    radial-gradient(900px 320px at 50% -180px, rgba(47,195,198,.16), rgba(47,195,198,0) 72%) no-repeat,
+    var(--page);
+  background-attachment:scroll;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) body{
+    background:
+      radial-gradient(900px 320px at 50% -180px, rgba(53,198,201,.16), rgba(53,198,201,0) 72%) no-repeat,
+      var(--page);
+  }
+}
+:root[data-theme="dark"] body{
+  background:
+    radial-gradient(900px 320px at 50% -180px, rgba(53,198,201,.16), rgba(53,198,201,0) 72%) no-repeat,
+    var(--page);
+}
+
+/* ---------- Header: garis gradasi + logo Sparks ---------- */
+.top{position:relative}
+.top::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:var(--brand-grad);opacity:.85;pointer-events:none;
+}
+.logo,.mark{
+  background:var(--brand-grad);
+  border-radius:11px;
+  box-shadow:0 2px 8px rgba(27,111,181,.30);
+}
+.logo svg,.mark svg{width:100%;height:100%;stroke:none;fill:none;display:block}
+.brand h1{letter-spacing:-.015em;font-weight:700}
+
+/* ---------- Navigasi & chip aktif ---------- */
+.subnav a[aria-current="page"]{
+  background:var(--brand-grad);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 2px 8px rgba(27,111,181,.25);
+}
+.cchip[aria-pressed="true"]{
+  background:var(--brand-grad);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 2px 8px rgba(27,111,181,.22);
+}
+.tabnav a[aria-current="page"]{
+  color:var(--accent);
+  box-shadow:0 1px 2px rgba(12,52,80,.10),inset 0 -2px 0 var(--brand-teal);
+}
+
+/* ---------- Kartu & permukaan ---------- */
+.kpi,.ccard,.table-wrap{border-radius:16px}
+.ccard{box-shadow:var(--shadow)}
+.ccard::before{height:4px}
+.table-wrap{border-color:var(--border)}
+
+/* ---------- Status sinkron pakai teal brand ---------- */
+.sync.ok::before{background:var(--brand-teal)}
+
+/* ---------- Sorotan angka utama ---------- */
+.kpi .k-val{letter-spacing:-.025em}
+.metric .m-val{letter-spacing:-.015em}
+
+/* ---------- Tombol utama (kalau ada) ---------- */
+.btn.primary,.btn[data-variant="primary"]{
+  background:var(--brand-grad);color:#fff;border-color:transparent;
+  box-shadow:0 2px 8px rgba(27,111,181,.25);
+}
+.btn.primary:hover,.btn[data-variant="primary"]:hover{filter:brightness(1.05)}
+
+/* ---------- Scrollbar halus ---------- */
+@media (pointer:fine){
+  *{scrollbar-color:rgba(27,111,181,.35) transparent}
+}

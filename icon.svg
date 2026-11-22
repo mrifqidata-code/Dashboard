@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0b6475"/>
-  <g fill="#ffffff">
-    <rect x="152" y="262" width="54" height="112" rx="13"/>
-    <rect x="229" y="196" width="54" height="178" rx="13"/>
-    <rect x="306" y="138" width="54" height="236" rx="13"/>
+  <defs>
+    <linearGradient id="sparks" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2FC3C6"/>
+      <stop offset="1" stop-color="#1B6FB5"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sparks)"/>
+  <g transform="translate(15 80.5) scale(18)">
+    <path d="M9.5 4c3.2 3.3 5 5.7 5 7.9a5 5 0 0 1-10 0c0-2.2 1.8-4.6 5-7.9z" fill="#FFFFFF"/>
+    <path d="M18.2 2.5 19.464 4.661 21.909 5.195 20.245 7.064 20.493 9.555 18.2 8.55 15.907 9.555 16.155 7.064 14.491 5.195 16.936 4.661Z" fill="#F7B733"/>
   </g>
-  <path d="M150 404c18 0 18-11 35.5-11s18 11 35.5 11 18-11 35.5-11 18 11 35.5 11 18-11 35.5-11 18 11 35.5 11" fill="none" stroke="#9fd6df" stroke-width="14" stroke-linecap="round"/>
 </svg>
