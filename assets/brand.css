@@ -115,9 +115,10 @@ body{
   background:var(--brand-grad);opacity:.85;pointer-events:none;
 }
 .logo,.mark{
-  background:var(--brand-grad);
-  border-radius:11px;
-  box-shadow:0 2px 8px rgba(27,111,181,.30);
+  background:none;
+  border-radius:0;
+  box-shadow:none;
+  filter:drop-shadow(0 2px 6px rgba(27,111,181,.22));
 }
 .logo svg,.mark svg{width:100%;height:100%;stroke:none;fill:none;display:block}
 .brand h1{letter-spacing:-.015em;font-weight:700}
