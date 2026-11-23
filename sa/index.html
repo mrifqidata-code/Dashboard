@@ -92,6 +92,16 @@ select:focus,.btn:focus-visible,.appnav a:focus-visible,.chip:focus-visible,.sa-
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 .sort{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);font-weight:600}
 .sort select{font-size:15px;min-height:36px;padding:5px 8px}
+/* Baris periode: Harian / Mingguan / Bulanan + navigasi (sama dengan halaman Rekap) */
+.weekrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:10px;flex:1 1 100%}
+.modeseg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}
+.modeseg button{border:0;background:transparent;padding:6px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13.5px;color:var(--ink-2);white-space:nowrap}
+.modeseg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.modeseg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:600px){ .modeseg{flex:1 1 100%} .modeseg button{flex:1} }
+.wb-nav{display:flex;align-items:center;gap:8px;flex:1 1 260px;max-width:480px;min-width:0}
+.wb-nav select,.wb-nav input[type=date]{flex:1 1 auto;min-height:38px}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13.5px}
 
 main{padding-top:16px}
 .notice{border-radius:12px;padding:12px 14px;font-size:13.5px;background:var(--crit-bg);color:var(--crit-ink);margin-bottom:14px}
@@ -174,6 +184,20 @@ main{padding-top:16px}
 
 <div class="fbar">
   <div class="wrap fb">
+    <div class="weekrow">
+      <div class="modeseg" id="modeSeg" role="group" aria-label="Jenis periode">
+        <button type="button" data-mode="day" aria-pressed="false">Harian</button>
+        <button type="button" data-mode="week" aria-pressed="false">Mingguan</button>
+        <button type="button" data-mode="month" aria-pressed="true">Bulanan</button>
+      </div>
+      <div class="wb-nav">
+        <button class="btn icon" id="wPrev" type="button" aria-label="Periode sebelumnya">‹</button>
+        <select id="wSel" aria-label="Pilih periode"></select>
+        <input type="date" id="dSel" aria-label="Pilih tanggal" hidden>
+        <button class="btn icon" id="wNext" type="button" aria-label="Periode berikutnya">›</button>
+      </div>
+      <button class="btn sm" id="wLatest" type="button">Terbaru</button>
+    </div>
     <div class="chips" id="chips" role="group" aria-label="Filter center"></div>
     <label class="sort">Urutkan
       <select id="sortSel">
@@ -225,6 +249,17 @@ const SEGS = [
   ['Star',  'Star (9–12 th)']
 ];
 const SEG_MIN_SU = 3;   // segmen dianggap "juara" hanya bila show up-nya cukup
+// Periode lain (Harian/Mingguan/bulan selain Reporting Month) dihitung langsung dari tab mentah Exboard
+// lewat query gviz publik (tanpa auth): Register Trial, Student Database, dan Revenue Record.
+const EX_ID = '1CLm1NYROYjPEGisRGw-A2ZMEk7OP6d3pDJywxTBJDXA';
+const PERIOD_KEY = 'saLite.period.v1';
+const PCAL_KEY = 'saLite.pcal.v1';  // cache hasil hitung periode terakhir
+const MIN_MONTH = '2026-05';        // awal data Register Trial
+const MON = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const MON_PJG = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const MONTHS_EN = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+// "6-17 Mo" dst di kolom E Register Trial → indeks segmen (urutan sama dengan SEGS)
+const AGE_IX = {'6-17 mo':0,'18-36 mo':1,'3-5 yo':2,'5-8+ yo':3,'9-12 yo':4};
 
 /* ================= Util ================= */
 const $ = s => document.querySelector(s);
@@ -240,6 +275,79 @@ function fmtRpS(v){
   return 'Rp ' + fmt(v, 0);
 }
 const fmtRp = v => (v==null || isNaN(v)) ? '—' : 'Rp ' + Math.round(v).toLocaleString('id-ID');
+const num0 = s => { s = String(s==null ? '' : s).replace(/[\s,]/g,''); if (!s || s === '-') return 0; const n = Number(s); return isFinite(n) ? n : 0; };
+
+/* ================= Tanggal & periode ================= */
+const pad2 = n => String(n).padStart(2,'0');
+const isoOf = d => d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+const TODAY = isoOf(new Date());
+const CUR_MONTH = TODAY.slice(0,7);
+const addDays = (s, n) => { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return isoOf(d); };
+const daysInMonth = m => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo, 0).getDate(); };
+function shiftMonth(m, n){ let [y, mo] = m.split('-').map(Number); mo += n; y += Math.floor((mo-1)/12); mo = ((mo-1)%12+12)%12+1; return y + '-' + pad2(mo); }
+function isoWeekOf(s){
+  const d = new Date(s + 'T12:00:00');
+  const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay()+6)%7));
+  const thu = new Date(mon); thu.setDate(mon.getDate()+3);
+  const y = thu.getFullYear(), jan4 = new Date(y, 0, 4, 12);
+  const w1 = new Date(jan4); w1.setDate(jan4.getDate() - ((jan4.getDay()+6)%7));
+  return y + '-W' + pad2(Math.round((mon - w1)/6048e5) + 1);
+}
+function mondayOf(week){
+  const [y, w] = week.split('-W').map(Number), jan4 = new Date(y, 0, 4, 12);
+  const mon = new Date(jan4); mon.setDate(jan4.getDate() - ((jan4.getDay()+6)%7) + (w-1)*7);
+  return isoOf(mon);
+}
+const shiftWeek = (k, n) => isoWeekOf(addDays(mondayOf(k), 7*n));
+const dayTxt = s => { const d = new Date(s+'T12:00:00'); return `${d.getDate()} ${MON_PJG[d.getMonth()]} ${d.getFullYear()}`; };
+const monthTxt = m => `${MON_PJG[+m.slice(5)-1]} ${m.slice(0,4)}`;
+function weekRangeTxt(week){
+  const a = mondayOf(week), b = addDays(a, 6);
+  const da = new Date(a+'T12:00:00'), db = new Date(b+'T12:00:00');
+  if (da.getMonth() !== db.getMonth() || da.getFullYear() !== db.getFullYear())
+    return `${da.getDate()} ${MON[da.getMonth()]} – ${db.getDate()} ${MON[db.getMonth()]} ${db.getFullYear()}`;
+  return `${da.getDate()}–${db.getDate()} ${MON[db.getMonth()]} ${db.getFullYear()}`;
+}
+// "Periode" aktif: kunci cache, rentang tanggal, dan label
+const P = {
+  cur: { day: () => TODAY, week: () => isoWeekOf(TODAY), month: () => CUR_MONTH },
+  min: { day: MIN_MONTH + '-01', week: isoWeekOf(MIN_MONTH + '-01'), month: MIN_MONTH },
+  keyOf: p => p.mode==='day' ? 'd:' + p.day : p.mode==='week' ? 'w:' + p.week : 'm:' + p.month,
+  rangeOf: p => p.mode==='day' ? [p.day, p.day]
+    : p.mode==='week' ? [mondayOf(p.week), addDays(mondayOf(p.week), 6)]
+    : [p.month + '-01', p.month + '-' + pad2(daysInMonth(p.month))],
+  labelOf: p => p.mode==='day' ? dayTxt(p.day)
+    : p.mode==='week' ? `W${p.week.slice(6)} · ${weekRangeTxt(p.week)}`
+    : monthTxt(p.month)
+};
+// Tanggal toleran di kolom Tanggal Full Payment (format sel campur): "2026-10-30", "30-Oct-2026",
+// "30 Oct 2026", "10/15/2026" (bulan/tanggal) dan "25/8/2026" (tanggal/bulan).
+const MON_EN3 = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function parseDateAny(s){
+  s = String(s==null ? '' : s).replace(/\s+/g,' ').trim(); if (!s) return null;
+  let m;
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+  if ((m = /^(\d{1,2})[ \-]([A-Za-z]{3,})\.?[ \-](\d{4})$/.exec(s))){
+    const k = MON_EN3.indexOf(m[2].slice(0,3).toLowerCase());
+    return k >= 0 ? `${m[3]}-${pad2(k+1)}-${pad2(m[1])}` : null;
+  }
+  if ((m = /^([A-Za-z]{3,})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(s))){
+    const k = MON_EN3.indexOf(m[1].slice(0,3).toLowerCase());
+    return k >= 0 ? `${m[3]}-${pad2(k+1)}-${pad2(m[2])}` : null;
+  }
+  if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s))){
+    const a = +m[1], b = +m[2];
+    if (b > 12) return `${m[3]}-${pad2(a)}-${pad2(b)}`;   // m/d/yyyy (contoh "8/30/2026")
+    return `${m[3]}-${pad2(b)}-${pad2(a)}`;               // d/m/yyyy (asumsi locale id)
+  }
+  return null;
+}
+async function gvizCsv(sheet, tq){
+  const url = `https://docs.google.com/spreadsheets/d/${EX_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}&tq=${encodeURIComponent(tq)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), {code:'gviz'});
+  return res.text();
+}
 
 /* ================= Baca feed ================= */
 const norm = s => String(s||'').toLowerCase().replace(/\s+/g,' ').replace(/→/g,'>').trim();
@@ -315,14 +423,28 @@ function parseFeed(text){
 
 /* ================= State ================= */
 let data = null, pulling = false, openSet = new Set();
+let roster = null, feedData = null, feedMonthKey = null;
+let sdRows = null;                                   // cache "Student Database" Status=Full (bebas periode)
+const calcCache = new Map();                         // kunci periode → {sas, pulledAt}
 let ui = Object.assign({sort:'rev'}, lsGet(UI_KEY) || {}, {center: DA.center.get()});
 if (!METRICS[ui.sort]) ui.sort = 'rev';
+if (!ui.period || !/^(day|week|month)$/.test(ui.period.mode || ''))
+  ui.period = {mode:'month', day:TODAY, week:isoWeekOf(TODAY), month:''};   // bulan diisi dari feed (Reporting Month)
+ui.period.day = ui.period.day || TODAY;
+ui.period.week = ui.period.week || isoWeekOf(TODAY);
+if (ui.period.month && ui.period.month < MIN_MONTH) ui.period.month = MIN_MONTH;
+if (ui.period.day < P.min.day) ui.period.day = P.min.day;
 
-function setData(text, pulledAt){
-  const p = parseFeed(text);
-  if (!p.sas.length) return p;
-  data = {sas:p.sas, total:p.total, period:p.period, pulledAt};
-  return p;
+// "October 2026" (Reporting Month di Exboard, bahasa Inggris) → '2026-10'
+function feedMonthOf(s){
+  const m = /([A-Za-z]+)\s+(\d{4})/.exec(s || ''); if (!m) return null;
+  const i = MONTHS_EN.indexOf(m[1].toLowerCase());
+  return i < 0 ? null : m[2] + '-' + pad2(i+1);
+}
+function setFeed(p, pulledAt){
+  feedData = {sas:p.sas, total:p.total, period:p.period, pulledAt};
+  feedMonthKey = feedMonthOf(p.period);
+  roster = p.sas.map(s => ({name: s.name, center: s.center}));
 }
 const active = s => (s.showUp||0) > 0;
 // Agregat dihitung ulang dari baris SA, supaya sama logikanya untuk "Semua" maupun per center
@@ -443,40 +565,193 @@ function render(){
 
 function renderFoot(){
   const parts = [];
-  if (data) parts.push(`<span>${data.sas.length} SA · ditarik ${esc(fmtTime(data.pulledAt))}. Revenue di Exboard tercatat dalam ribuan rupiah.</span>`);
-  parts.push(`<span>Sumber: <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Acquisition SA (dari Exboard)</a>, yang mengambil tab 02B Acquisition SA lewat IMPORTRANGE. Periode mengikuti Reporting Month di Settings Exboard.</span>`);
+  if (data) parts.push(`<span>${data.sas.length} SA · ditarik ${esc(fmtTime(data.pulledAt))}.</span>`);
+  if (data && data.src === 'calc'){
+    parts.push(`<span>Sumber: dihitung langsung dari tab <b>Register Trial</b> (funnel & age group), <b>Student Database</b> (FP SD), dan <b>Revenue Record</b> (revenue) di Exboard untuk ${esc(data.period)}. Rumus sama dengan tab 02B Acquisition SA; sel Tanggal Full Payment berformat teks dibaca toleran, dan sel Show Up berisi teks "TRUE" tidak terbaca via query (show up bisa 1–3 baris lebih rendah).</span>`);
+  } else if (data){
+    parts.push(`<span>Sumber: <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Acquisition SA (dari Exboard)</a> (tab 02B Acquisition SA). Revenue di Exboard tercatat dalam ribuan rupiah. Mode Harian/Mingguan dan bulan lain dihitung langsung dari Exboard.</span>`);
+  }
   $('#foot').innerHTML = parts.join('');
 }
 
 /* ================= Tarik data ================= */
-async function pull(){
+// Feed bulanan (roster + angka Reporting Month). Fallback selalu tersedia untuk mode Bulanan.
+async function ensureFeed(force){
+  if (feedData && !force) return true;
+  const text = await fetchPublicCsv(FEED_ID);
+  const now = Date.now(), p = parseFeed(text);
+  if (!p.sas.length) return false;
+  lsSet(CACHE_KEY, {text, pulledAt: now});
+  setFeed(p, now);
+  return true;
+}
+// Hitung satu periode langsung dari Exboard: Register Trial (leads/SU/paid/age group),
+// Student Database (FP SD), Revenue Record (revenue). Rumus mengikuti tab 02B Acquisition SA.
+async function computePeriod(from, to){
+  if (!roster) throw Object.assign(new Error('feed'), {code:'feed'});
+  if (!sdRows){
+    sdRows = parseCSV(await gvizCsv('Student Database', `select CA, BZ where E = 'Full'`)).slice(1);
+  }
+  const [rtCsv, rrCsv] = await Promise.all([
+    gvizCsv('Register Trial', `select E,J,N,O,U,Z,AD where B >= date '${from}' and B <= date '${to}'`),
+    gvizCsv('Revenue Record', `select J, sum(H) where S >= date '${from}' and S <= date '${to}' group by J format sum(H) '0'`)
+  ]);
+  const names = roster.map(r => r.name.toLowerCase());
+  const blank = () => ({leads:0, su:0, noShow:0, dp:0, full:0, sunp:0, z:0, fpsd:0, rev:0,
+    suAge:[0,0,0,0,0], paidAge:[0,0,0,0,0], reasons:new Map()});
+  const agg = new Map(names.map(n => [n, blank()]));
+  const isDp = o => o === 'regis fee only';
+  const isFull = o => o === 'regis + member fee' || o === 'member fee';
+  for (const r of parseCSV(rtCsv).slice(1)){
+    const a = agg.get(norm(r[1])); if (!a) continue;
+    const e = norm(r[0]), n = norm(r[2]), o = norm(r[3]), u = norm(r[4]), z = norm(r[5]), ad = norm(r[6]);
+    a.leads++;
+    if (n === 'true'){
+      // Show Up di 02B mengecualikan Cross Poll dan 9-12 Yo
+      if (ad !== 'cross poll' && e !== '9-12 yo') a.su++;
+      if (u) a.sunp++;
+      if (z.startsWith('sangat aktif')) a.z++;
+      const ai = AGE_IX[e]; if (ai != null) a.suAge[ai]++;
+    } else if (n === 'false') a.noShow++;
+    if (ad !== 'cross poll'){
+      const ai = AGE_IX[e];
+      if (ai != null && (isDp(o) || isFull(o))) a.paidAge[ai]++;
+      if (isDp(o)) a.dp++;
+      if (isFull(o)) a.full++;
+    }
+    if (n === 'true' && u) a.reasons.set(u, (a.reasons.get(u) || 0) + 1);
+  }
+  for (const r of sdRows){
+    const a = agg.get(norm(r[0])); if (!a) continue;
+    const d = parseDateAny(r[1]);
+    if (d && d >= from && d <= to) a.fpsd++;
+  }
+  for (const r of parseCSV(rrCsv).slice(1)){
+    const j = norm(r[0]); if (!j) continue;
+    // Revenue Record dipakai dengan awalan nama (rumus Sheets: $A7&"*") → nama terpanjang menang
+    const best = names.filter(n => j.startsWith(n)).sort((x, y) => y.length - x.length)[0];
+    if (best) agg.get(best).rev += num0(r[1]);
+  }
+  const zero = v => v > 0 ? v : null;   // sheet menampilkan 0 sebagai "-"
+  return roster.map(r => {
+    const a = agg.get(r.name.toLowerCase());
+    const total = a.dp + a.full, suBT = a.suAge[0] + a.suAge[1], paidBT = a.paidAge[0] + a.paidAge[1];
+    let top = null, max = 0;
+    a.reasons.forEach((c, reason) => { if (c > max){ max = c; top = reason; } });
+    return {
+      name: r.name, center: r.center,
+      leads: zero(a.leads), showUp: zero(a.su), noShow: zero(a.noShow),
+      paidDp: zero(a.dp), paidFull: zero(a.full), totalPaid: zero(total),
+      fpsd: zero(a.fpsd), rev: zero(a.rev),
+      suRate: a.leads > 0 && a.su > 0 ? a.su/a.leads*100 : null,
+      cvr: a.su > 0 && total > 0 ? total/a.su*100 : null,
+      fpr: total > 0 && a.full > 0 ? a.full/total*100 : null,
+      sunp: zero(a.sunp), sunpRate: a.su > 0 && a.sunp > 0 ? a.sunp/a.su*100 : null,
+      revPerSu: a.fpsd > 0 && a.rev > 0 ? a.rev/a.fpsd : null,
+      suBT: zero(suBT), paidBT, bt: suBT > 0 && paidBT > 0 ? paidBT/suBT*100 : null,
+      segs: SEGS.map(([k, label], i) => ({k, label, su: zero(a.suAge[i]),
+        cvr: a.suAge[i] > 0 && a.paidAge[i] > 0 ? a.paidAge[i]/a.suAge[i]*100 : null})),
+      topReason: top,
+      engaged: a.su > 0 && a.z > 0 ? a.z/a.su*100 : null
+    };
+  });
+}
+function applyCalc(rec, label){
+  data = {sas: rec.sas, total: null, period: label, pulledAt: rec.pulledAt, src: 'calc'};
+}
+async function loadPeriod(force){
   if (pulling) return;
   pulling = true; $('#pullBtn').disabled = true; $('#pullBtn').classList.add('spin');
   setStatus('busy', 'Menarik data…');
+  const p = ui.period, key = P.keyOf(p);
   try {
-    const text = await fetchPublicCsv(FEED_ID);
-    const now = Date.now(), p = setData(text, now);
-    if (!p.sas.length){
-      setStatus('err', 'Feed belum siap');
-      showErr(p.refErr ? `<b>Sheet feed belum bisa membaca Exboard.</b> Buka <a href="${FEED_URL}" target="_blank" rel="noopener">Sheet feed</a>, klik sel A1, lalu pilih "Allow access".`
-        : `<b>Tabel SA tidak terbaca.</b> Pastikan tab 02B Acquisition SA masih punya baris judul "STUDENT ADVISOR, Center, …".`);
+    const cached = calcCache.get(key);
+    if (cached && !force){
+      applyCalc(cached, P.labelOf(p));
+      setStatus('ok', 'Tersinkron · ' + fmtTime(cached.pulledAt));
+      showErr('');
+      return;
+    }
+    const okFeed = await ensureFeed(force);
+    if (!okFeed) throw Object.assign(new Error('feed'), {code:'feed'});
+    if (p.mode === 'month' && !p.month){
+      p.month = feedMonthKey || CUR_MONTH;                       // default: Reporting Month di Exboard
+      lsSet(PERIOD_KEY, ui.period); syncBar();
+    }
+    if (p.mode === 'month' && p.month === feedMonthKey){
+      // Bulan Reporting Month = angka persis tab 02B (sumber resmi)
+      data = Object.assign({}, feedData, {src: 'feed'});
+      setStatus('ok', 'Tersinkron · ' + fmtTime(feedData.pulledAt));
+      showErr('');
     } else {
-      lsSet(CACHE_KEY, {text, pulledAt: now});
-      setStatus('ok', 'Tersinkron · ' + fmtTime(now));
+      const [from, to] = P.rangeOf(p);
+      const sas = await computePeriod(from, to);
+      const rec = {sas, pulledAt: Date.now()};
+      calcCache.set(key, rec);
+      lsSet(PCAL_KEY, {key, sas, pulledAt: rec.pulledAt});
+      applyCalc(rec, P.labelOf(p));
+      setStatus('ok', 'Tersinkron · ' + fmtTime(rec.pulledAt));
       showErr('');
     }
   } catch(err){
     setStatus('err', data ? 'Data ' + fmtTime(data.pulledAt) : 'Gagal menarik');
-    const why = err && err.code==='offline' ? 'HP sedang offline.'
-      : `Sheet feed belum bisa dibaca dari aplikasi ini. Pemilik Sheet perlu membuka <a href="${FEED_URL}" target="_blank" rel="noopener">Feed Acquisition SA</a> → Bagikan → Akses umum → <b>Siapa saja yang memiliki link</b> (Viewer).`;
-    showErr(`<b>Data terbaru belum bisa ditarik.</b> ${why}${data ? ` Menampilkan data terakhir (${esc(fmtTime(data.pulledAt))}).` : ''}`);
+    const why = err.code === 'feed'
+      ? `Feed 02B belum bisa dibaca. Buka <a href="${FEED_URL}" target="_blank" rel="noopener">Sheet feed</a>, klik sel A1, lalu pilih "Allow access".`
+      : `Exboard (tab Register Trial, Student Database, atau Revenue Record) belum bisa dibaca. Coba tarik ulang, atau kembali ke mode <b>Bulanan</b>.`;
+    showErr(`<b>Data periode ini belum bisa dihitung.</b> ${why}${data ? ` Menampilkan data terakhir (${esc(fmtTime(data.pulledAt))}).` : ''}`);
   } finally {
     pulling = false; $('#pullBtn').disabled = false; $('#pullBtn').classList.remove('spin');
     render();
   }
 }
 
+/* ================= Baris periode ================= */
+function syncBar(){
+  const p = ui.period, m = p.mode;
+  document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+  $('#dSel').hidden = m !== 'day';
+  $('#wSel').hidden = m === 'day';
+  if (m === 'day'){
+    const d = $('#dSel'); d.value = p.day; d.min = P.min.day; d.max = TODAY;
+  } else if (m === 'week'){
+    const list = []; let k = P.cur.week();
+    for (let i = 0; i < 12 && k >= P.min.week; i++){ list.unshift(k); k = shiftWeek(k, -1); }
+    $('#wSel').innerHTML = list.map(x => `<option value="${x}"${x===p.week?' selected':''}>W${x.slice(6)} · ${weekRangeTxt(x)}</option>`).join('');
+  } else {
+    const list = []; let k = CUR_MONTH;
+    for (let i = 0; i < 8 && k >= P.min.month; i++){ list.unshift(k); k = shiftMonth(k, -1); }
+    $('#wSel').innerHTML = list.map(x => `<option value="${x}"${x===p.month?' selected':''}>${monthTxt(x)}</option>`).join('');
+  }
+  const atMin = m==='day' ? p.day <= P.min.day : m==='week' ? p.week <= P.min.week : p.month <= P.min.month;
+  const atMax = m==='day' ? p.day >= TODAY : m==='week' ? p.week >= P.cur.week() : p.month >= CUR_MONTH;
+  $('#wPrev').disabled = atMin; $('#wNext').disabled = atMax;
+  $('#wLatest').textContent = m === 'day' ? 'Hari ini' : 'Terbaru';
+  $('#wLatest').disabled = atMax;
+}
+function setKey(k){
+  const p = ui.period;
+  if (p.mode==='day') p.day = k; else if (p.mode==='week') p.week = k; else p.month = k;
+  lsSet(PERIOD_KEY, ui.period);
+  syncBar(); loadPeriod();
+}
+function step(n){
+  const p = ui.period;
+  setKey(p.mode==='day' ? addDays(p.day, n) : p.mode==='week' ? shiftWeek(p.week, n) : shiftMonth(p.month, n));
+}
+function setMode(m){
+  if (ui.period.mode === m) return;
+  ui.period.mode = m;
+  lsSet(PERIOD_KEY, ui.period);
+  syncBar(); loadPeriod();
+}
+
 /* ================= Event ================= */
+$('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode); });
+$('#wSel').addEventListener('change', e => setKey(e.target.value));
+$('#dSel').addEventListener('change', e => { const v = e.target.value; if (v && v <= TODAY) setKey(v); });
+$('#wPrev').addEventListener('click', () => step(-1));
+$('#wNext').addEventListener('click', () => step(1));
+$('#wLatest').addEventListener('click', () => setKey(P.cur[ui.period.mode]()));
 $('#sortSel').addEventListener('change', e => { ui.sort = e.target.value; lsSet(UI_KEY, ui); render(); });
 $('#view').addEventListener('click', e => {
   const h = e.target.closest('button.sa-head'); if (!h) return;
@@ -485,17 +760,27 @@ $('#view').addEventListener('click', e => {
   if (open) openSet.add(id); else openSet.delete(id);
   art.classList.toggle('open', open); h.setAttribute('aria-expanded', String(open)); body.hidden = !open;
 });
-$('#pullBtn').addEventListener('click', pull);
+$('#pullBtn').addEventListener('click', () => loadPeriod(true));
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && (!data || Date.now() - data.pulledAt > STALE_MS)) pull();
+  if (document.visibilityState === 'visible' && (!data || Date.now() - data.pulledAt > STALE_MS)) loadPeriod(true);
 });
 
 /* ================= Mulai ================= */
 DA.mountNav('sa');
 const cached = lsGet(CACHE_KEY);
-if (cached && typeof cached.text === 'string' && setData(cached.text, cached.pulledAt).sas.length) setStatus('', 'Data ' + fmtTime(cached.pulledAt));
+if (cached && typeof cached.text === 'string'){
+  const p = parseFeed(cached.text);
+  if (p.sas.length){ setFeed(p, cached.pulledAt); setStatus('', 'Data ' + fmtTime(cached.pulledAt)); }
+}
+const pcal = lsGet(PCAL_KEY);
+if (pcal && pcal.key === P.keyOf(ui.period) && Array.isArray(pcal.sas) && roster
+    && !(ui.period.mode === 'month' && ui.period.month === feedMonthKey)){
+  calcCache.set(pcal.key, {sas: pcal.sas, pulledAt: pcal.pulledAt || 0});
+  applyCalc(calcCache.get(pcal.key), P.labelOf(ui.period));
+}
+syncBar();
 render();
-pull();
+loadPeriod();
 })();
 </script>
 </body>

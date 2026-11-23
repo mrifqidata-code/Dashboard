@@ -11,7 +11,7 @@ Aplikasi web ringan (tanpa server, tanpa build) untuk membuka dashboard dari HP.
 | | Retention (cohort, status follow-up, tren, alasan churn) | `center/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | Cash & Piutang › Ringkasan (penerimaan, piutang, cash bertahap) | `center/cash/` | Feed Dashboard Tambahan (tab 12) |
 | | Cash & Piutang › Cash Bertahap (jatuh tempo bulan ini, tunggakan, status cicilan, sisa tagihan, daftar murid perlu ditagih) | `center/cash/bertahap/` | Feed Cash Bertahap v3 (tab CB Tracker + 16 Cash Bertahap, rumus di `docs/feed-cash-bertahap.md`); daftar nama lewat Apps Script ber-PIN (`docs/student/`) |
-| **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) |
+| **Student Advisor** | Acquisition (CVR SU→Paid, CVR Baby Tiny, Full Pay Rate, FP SD, Revenue) | `sa/` | Feed Acquisition SA (tab 02B) + Exboard mentah untuk periode lain |
 | | Retention per SA Retention (SAR) | `sa/retention/` | Feed Dashboard Tambahan (tab 03) |
 | | PIP (band & status PIP / Watch / OK per advisor) | `sa/pip/` | Feed Dashboard Tambahan (tab 05) |
 | **Kelas** | Slot Map (klik slot → coach yang tersedia di jam itu) | `kelas/` | Feed Slot Map (Reguler Class Availability) |
@@ -54,6 +54,12 @@ Kalau dibuka lewat claude.ai (artifact), Slot Map (`kelas/`) tetap membaca lewat
 - Threshold status memakai nilai bawaan (Acquisition/Revenue hijau ≥100%, merah <90%; CVR hijau ≥45%, merah <35%;
   DP → FP hijau ≥80%, merah <70%).
 - Revenue di tab 02B Acquisition SA tercatat dalam ribuan rupiah; halaman SA mengalikannya ×1.000.
+- Halaman SA punya pilihan periode **Harian / Mingguan / Bulanan** (minggu ISO Senin–Minggu) dengan navigasi
+  ‹ › dan tombol Hari ini/Terbaru. Bulan Reporting Month di Exboard memakai angka feed 02B apa adanya;
+  periode lain dihitung langsung dari tab mentah Exboard lewat query gviz publik dengan rumus yang sama
+  (Register Trial untuk funnel & age group, Student Database Status=Full untuk FP SD, Revenue Record untuk
+  revenue). Sel Tanggal Full Payment berformat teks dibaca toleran, dan sel Show Up berisi teks "TRUE"
+  tidak terbaca via query, jadi show up periode lain bisa 1–3 baris lebih rendah dari Sheets.
 - Warna di halaman SA: CVR / CVR Baby Tiny / Full Pay Rate hijau bila ≥ rata-rata area, merah bila 30% di bawahnya.
 - CVR Baby Tiny = (paid Baby + paid Tiny) / (show up Baby + show up Tiny), dari bagian B tab 02B
   (paid per segmen = show up × CVR segmen). Kolom BT di sheet tidak dipakai karena pembaginya berbeda.
