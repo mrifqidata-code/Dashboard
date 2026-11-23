@@ -118,6 +118,8 @@ main{padding-top:16px}
 .sa:nth-child(-n+3) .rank{background:var(--accent-soft);color:var(--accent)}
 .sa-name{font-size:16px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ctr{font-size:11.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:0 6px;flex:none}
+.seg{font-size:11.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:0 7px;white-space:nowrap;flex:none;font-variant-numeric:tabular-nums}
+.seg b{font-weight:800}
 .chev{margin-left:auto;width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;flex:none;transition:transform .15s}
 .sa.open .chev{transform:rotate(180deg)}
 .mets{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px 14px;margin-top:10px}
@@ -214,6 +216,15 @@ const METRICS = {
   fpsd: {label:'FP SD', short:'FP SD'},
   rev:  {label:'Revenue', short:'Revenue'}
 };
+// Segmen umur di blok B feed (urutan sama dengan kolom 02B Acquisition SA)
+const SEGS = [
+  ['Baby',  'Baby (6–17 bln)'],
+  ['Tiny',  'Tiny (18–36 bln)'],
+  ['Little','Little (3–5 th)'],
+  ['Kids',  'Kids (5–8+ th)'],
+  ['Star',  'Star (9–12 th)']
+];
+const SEG_MIN_SU = 3;   // segmen dianggap "juara" hanya bila show up-nya cukup
 
 /* ================= Util ================= */
 const $ = s => document.querySelector(s);
@@ -265,7 +276,12 @@ function parseFeed(text){
   const bi = rows.findIndex((r, i) => i > hi && norm(r[0])==='student advisor' && r.some(c => norm(c)==='6-17 mo show up'));
   if (bi >= 0){
     const h = rows[bi].map(norm), at = name => h.indexOf(name);
-    const ix = {suBaby: at('6-17 mo show up'), suTiny: at('18-36 mo show up'), cvrBaby: at('6-17 mo cvr'), cvrTiny: at('18-36 mo cvr')};
+    const ix = {
+      suBaby: at('6-17 mo show up'), suTiny: at('18-36 mo show up'),
+      suLittle: at('3-5 yo show up'), suKids: at('5-8+ yo show up'), suStar: at('9-12 yo show up'),
+      cvrBaby: at('6-17 mo cvr'), cvrTiny: at('18-36 mo cvr'),
+      cvrLittle: at('3-5 yo cvr'), cvrKids: at('5-8+ yo cvr'), cvrStar: at('9-12 yo cvr')
+    };
     const by = new Map(out.sas.map(s => [s.name.toLowerCase(), s]));
     for (const r of rows.slice(bi+1)){
       const name = (r[0]||'').trim();
@@ -277,6 +293,7 @@ function parseFeed(text){
       s.suBT = (s.suBaby || 0) + (s.suTiny || 0);
       s.paidBT = paid(s.suBaby, s.cvrBaby) + paid(s.suTiny, s.cvrTiny);
       s.bt = s.suBT > 0 ? s.paidBT / s.suBT * 100 : null;
+      s.segs = SEGS.map(([k, label]) => ({k, label, su: s['su' + k] || 0, cvr: s['cvr' + k]}));
     }
   }
   // C. SINYAL KUALITAS PITCHING: alasan gagal terbanyak per SA
@@ -321,6 +338,15 @@ function agg(list){
 function tone(k, v, ref){
   if (v==null || ref==null || !(k==='cvr' || k==='bt' || k==='fpr')) return '';
   return v >= ref ? 'g' : v < ref*LOW ? 'r' : '';
+}
+// Age group dengan CVR tertinggi. Wajib punya show up cukup, supaya "1 dari 1 = 100%" tidak jadi juara.
+function bestSeg(s){
+  if (!s.segs) return null;
+  const ada = s.segs.filter(x => x.cvr != null && x.su > 0);
+  const cukup = ada.filter(x => x.su >= SEG_MIN_SU);
+  const list = cukup.length ? cukup : ada;
+  if (!list.length) return null;
+  return list.slice().sort((a, b) => b.cvr - a.cvr || b.su - a.su)[0];
 }
 const mval = (k, v) => k==='rev' ? fmtRpS(v) : k==='fpsd' ? fmt(v,0) : fmtPct(v);
 
@@ -375,9 +401,11 @@ function render(){
   };
   const card = (s, i) => {
     const id = s.name + '|' + s.center, open = openSet.has(id);
+    const best = bestSeg(s);
+    const pill = best ? `<span class="seg" title="CVR tertinggi: ${esc(best.label)} (min. ${SEG_MIN_SU} show up)">★ ${esc(best.k)} <b>${fmtPct(best.cvr,0)}</b></span>` : '';
     return `<article class="sa${open?' open':''}">
       <button type="button" class="sa-head" data-id="${esc(id)}" aria-expanded="${open}">
-        <div class="sa-top"><span class="rank">${i+1}</span><span class="sa-name">${esc(s.name)}</span><span class="ctr">${esc(s.center)}</span>
+        <div class="sa-top"><span class="rank">${i+1}</span><span class="sa-name">${esc(s.name)}</span><span class="ctr">${esc(s.center)}</span>${pill}
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div>
         <div class="mets">${['cvr','bt','fpr','fpsd','rev'].map(key => met(s, key)).join('')}</div>
       </button>
@@ -392,8 +420,7 @@ function render(){
           <div><dt>SUNP</dt><dd>${fmt(s.sunp,0)} <small>${fmtPct(s.sunpRate)} SU</small></dd></div>
           <div><dt>Rev / show up</dt><dd>${fmtRpS(s.revPerSu)}</dd></div>
           <div><dt>Revenue</dt><dd>${fmtRp(s.rev)}</dd></div>
-          <div><dt>Baby (6–17 bln)</dt><dd>${fmt(s.suBaby,0)} SU <small>${fmtPct(s.cvrBaby)}</small></dd></div>
-          <div><dt>Tiny (18–36 bln)</dt><dd>${fmt(s.suTiny,0)} SU <small>${fmtPct(s.cvrTiny)}</small></dd></div>
+          ${(s.segs||[]).map(x => `<div><dt>${esc(x.label)}</dt><dd>${fmt(x.su,0)} SU <small>${fmtPct(x.cvr)}</small></dd></div>`).join('')}
           ${s.engaged!=null?`<div><dt>Parent engaged</dt><dd>${fmtPct(s.engaged)}</dd></div>`:''}
         </dl>
         ${s.topReason?`<p class="why">Alasan gagal terbanyak: <b>${esc(s.topReason)}</b></p>`:''}
@@ -409,6 +436,7 @@ function render(){
       <span><i style="background:var(--good-ink)"></i>Hijau: ≥ rata-rata area (CVR ${fmtPct(area.cvr)} · Baby Tiny ${fmtPct(area.bt)} · Full Pay ${fmtPct(area.fpr)})</span>
       <span><i style="background:var(--crit-ink)"></i>Merah: 30% di bawah rata-rata area</span>
       <span><i style="background:var(--ink-2);width:2px;height:12px;border-radius:1px"></i>Garis = rata-rata area (FP SD & Revenue: rata-rata per SA)</span>
+      <span><i style="background:var(--accent-soft)"></i>★ = age group dengan CVR tertinggi (min. ${SEG_MIN_SU} show up)</span>
     </div>
     ${offHtml}`;
 }
